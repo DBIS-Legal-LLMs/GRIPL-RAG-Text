@@ -42,9 +42,6 @@ class EvaluationDataController(
     @GetMapping("", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun getAllBpmnDatasetMeta(): List<EvaluationDataMeta> {
         val datasets = evaluationDataRepository.getAllEvaluationData()
-        if (datasets.isEmpty()) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "No datasets found")
-        }
         return datasets.map { EvaluationDataMeta(it.id, it.name, it.datasetId) }
     }
 
