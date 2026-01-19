@@ -26,6 +26,20 @@ This project provides:
 
 Environment specific values (like hosts, Traefik network name, email, ports) are provided via `.env` files.
 
+Attention: If you are using **Windows**, make sure to adjust the following:
+- Under Settins > General enable: Expose daemon on tcp://localhost:2375 without TLS
+- Under Settings > Docker Engine add: "min-api-version": "1.24"
+
+Attention: If you are using **Linux**:
+- Change the docker-compose.traefik to use
+  ```bash
+  command:
+    - --providers.docker=true
+    - --providers.docker.endpoint=unix://var/run/docker.sock
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+  ```
+
 ---
 
 ### 1. Run locally
