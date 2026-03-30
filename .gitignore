@@ -6,3 +6,5 @@
 .env.*
 !.env.local.example
 !.env.prod.example
+
+get-docker.sh

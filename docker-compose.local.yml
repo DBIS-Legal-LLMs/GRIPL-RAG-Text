@@ -10,7 +10,7 @@ services:
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
     ports:
-      - "80:80"
+      - "${WEB_PORT:-8000}:80"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -32,7 +32,7 @@ services:
     env_file:
       - .env.local
     environment:
-      - FRONTEND_BASE_URL=http://localhost
+      - FRONTEND_BASE_URL=http://localhost:${WEB_PORT:-8000}
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/${POSTGRES_DB:-gripldb}
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-postgres}
