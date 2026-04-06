@@ -54,6 +54,23 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
 
+  gripl-neo4j:
+    image: neo4j:5-community
+    container_name: gripl-neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-gripl-rag-2026}
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - app
+
 networks:
   app:
     external: false
+
+volumes:
+  neo4j_data:

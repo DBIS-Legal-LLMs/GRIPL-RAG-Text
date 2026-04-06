@@ -1,2 +1,23 @@
-# PDF text extraction
+# ===========================================
+# GRIPL RAG Service Dependencies
+# ===========================================
+
+# --- PDF extraction ---
 pymupdf>=1.27.0
+
+# --- LightRAG core ---
+lightrag-hku>=1.4.0
+
+# --- Google Gemini SDK ---
+google-genai>=1.0.0
+
+# --- Neo4j Python driver ---
+neo4j>=5.0.0
+
+# --- FastAPI + server ---
+fastapi>=0.115.0
+uvicorn>=0.30.0
+
+# --- Settings management ---
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0

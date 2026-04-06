@@ -8,3 +8,9 @@
 !.env.prod.example
 
 get-docker.sh
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
