@@ -20,3 +20,6 @@ __pycache__/
 # LightRAG runtime data
 rag_working_dir/
 gripl/gripl-rag/.env
+
+# Personal notes
+RUNNING.md

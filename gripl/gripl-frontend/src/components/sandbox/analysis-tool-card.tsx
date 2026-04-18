@@ -16,6 +16,7 @@ import LlmModelNameDatalist from "@/components/datalist/llm-model-name-datalist"
 import LlmApiKeyPlaceholderDatalist from "@/components/datalist/llm-api-key-placeholder-datalist";
 import {GenerateRandomInput} from "@/components/ui/input-generate-random";
 import {safeFloatOrNull} from "@/lib/evaluation-config-utils";
+import {Switch} from "@/components/ui/switch";
 
 interface AnalysisToolCardProps {
     bpmnXml: string;
@@ -31,6 +32,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
     const [seed, setSeed] = useState<number | null>(null)
     const [temperature, setTemperature] = useState<number | null>(null)
     const [topP, setTopP] = useState<number | null>(null)
+    const [useRag, setUseRag] = useState<boolean>(false)
     const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
 
     function handleAnalyzeClick() {
@@ -51,6 +53,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
         } as LlmPropsOverride
         const jsonBlob = new Blob([JSON.stringify(llmProps)], { type: "application/json" });
         formData.append("llmProps", jsonBlob);
+        formData.append("useRag", String(useRag));
 
         fetch(`/api/gdpr/analysis/prompt-engineering`, {
             method: "POST",
@@ -145,6 +148,14 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
                 <Label>Top P</Label>
                 <Input type="number" placeholder="1.0" value={topP ?? ""}
                        onChange={(e) => setTopP(safeFloatOrNull(e.target.value))}/>
+            </div>
+            <div className="flex items-center space-x-2 pt-2">
+                <Switch 
+                    id="use-rag" 
+                    checked={useRag} 
+                    onCheckedChange={setUseRag} 
+                />
+                <Label htmlFor="use-rag" className="cursor-pointer">Use RAG for the Analysis</Label>
             </div>
             <div className="py-2">
                 <Separator/>

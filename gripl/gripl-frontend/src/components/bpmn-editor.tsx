@@ -27,7 +27,7 @@ interface BpmnEditorProps {
 
 export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = [], onNew, onDiagramChanged, cards = [],
                                      editorClassName, disableEditing, onEvent, onModelerChanged }: BpmnEditorProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const modelerRef = useRef<any>(null)
   const [isLoaded, setIsLoaded] = useState(false)
   const [canUndo, setCanUndo] = useState(false)
