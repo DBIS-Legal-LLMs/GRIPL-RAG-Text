@@ -17,6 +17,7 @@ import LlmApiKeyPlaceholderDatalist from "@/components/datalist/llm-api-key-plac
 import {GenerateRandomInput} from "@/components/ui/input-generate-random";
 import {safeFloatOrNull} from "@/lib/evaluation-config-utils";
 import {Switch} from "@/components/ui/switch";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 
 interface AnalysisToolCardProps {
     bpmnXml: string;
@@ -33,6 +34,7 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
     const [temperature, setTemperature] = useState<number | null>(null)
     const [topP, setTopP] = useState<number | null>(null)
     const [useRag, setUseRag] = useState<boolean>(false)
+    const [searchMode, setSearchMode] = useState<string>("hybrid")
     const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
 
     function handleAnalyzeClick() {
@@ -54,6 +56,9 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
         const jsonBlob = new Blob([JSON.stringify(llmProps)], { type: "application/json" });
         formData.append("llmProps", jsonBlob);
         formData.append("useRag", String(useRag));
+        if (useRag) {
+            formData.append("ragMode", searchMode);
+        }
 
         fetch(`/api/gdpr/analysis/prompt-engineering`, {
             method: "POST",
@@ -157,6 +162,22 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
                 />
                 <Label htmlFor="use-rag" className="cursor-pointer">Use RAG for the Analysis</Label>
             </div>
+            {useRag && (
+                <div className="space-y-1 pt-2">
+                    <Label>RAG Search Mode</Label>
+                    <Select value={searchMode} onValueChange={setSearchMode}>
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select search mode" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="naive">Naive</SelectItem>
+                            <SelectItem value="local">Local</SelectItem>
+                            <SelectItem value="global">Global</SelectItem>
+                            <SelectItem value="hybrid">Hybrid</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
             <div className="py-2">
                 <Separator/>
             </div>
