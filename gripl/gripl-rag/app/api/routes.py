@@ -16,6 +16,7 @@ from app.schemas.query import (
     HealthResponse,
 )
 from app.rag.engine import create_rag_instance
+from app.rag.parser import parse_rag_response
 
 logger = logging.getLogger(__name__)
 
@@ -80,12 +81,17 @@ async def query_rag(request: QueryRequest):
         if result is None:
             result = ""
 
-        logger.info("Query completed successfully (response length=%d)", len(result))
+        # Parse the raw markdown/JSON string into structured dict
+        parsed_result = parse_rag_response(result)
+    
+        logger.info("Query completed successfully (response length=%d, entities=%d, relationships=%d, documents=%d)", 
+                    len(result), len(parsed_result["entities"]), 
+                    len(parsed_result["relationships"]), len(parsed_result["documents"]))
 
         return QueryResponse(
             query=request.query,
             mode=mode,
-            response=result,
+            response=parsed_result,
             status="success",
         )
 

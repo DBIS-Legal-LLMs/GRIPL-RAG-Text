@@ -35,9 +35,9 @@ class QueryResponse(BaseModel):
         ...,
         description="The search mode that was used.",
     )
-    response: str = Field(
+    response: dict = Field(
         ...,
-        description="The retrieved context / generated response from LightRAG.",
+        description="Parsed context with entities, relationships, and documents.",
     )
     status: str = Field(
         default="success",
