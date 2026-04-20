@@ -4,5 +4,5 @@ import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 
 interface BpmnAnalyzer {
 
-    fun analyzeBpmnForGdpr(bpmnXml: String): AnalysisResponse
+    fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean = false, ragMode: String = "hybrid"): AnalysisResponse
 }

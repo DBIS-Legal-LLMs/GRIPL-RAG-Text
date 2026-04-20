@@ -55,8 +55,17 @@ class AnalysisController(
     )
     fun analyzeBpmnForGdprPromptEngineering(
         @RequestPart("bpmnFile") file: FilePart,
-        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?
     ): Mono<ResponseEntity<AnalysisResponse>> {
+
+        val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
+        val ragMode = if (useRag) {
+            ragModePart?.value() ?: "hybrid"
+        } else {
+            null
+        }
 
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
         val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
@@ -65,8 +74,11 @@ class AnalysisController(
             Mono.fromCallable {
                 val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
                 val analyzer = analyzerFactory.createPromptEngineeringAnalyzer(llm)
-                analyzer.analyzeBpmnForGdpr(bpmnXml)
-            }.subscribeOn(Schedulers.boundedElastic())
+                analyzer.analyzeBpmnForGdpr(
+                    bpmnXml = bpmnXml,
+                    useRag = useRag,
+                    ragMode = ragMode
+                )            }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
 
@@ -82,9 +94,17 @@ class AnalysisController(
     )
     fun analyzeBpmnForGdprBaseline(
         @RequestPart("bpmnFile") file: FilePart,
-        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null
+        @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
+        @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?
     ): Mono<ResponseEntity<AnalysisResponse>> {
 
+        val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
+        val ragMode = if (useRag) {
+            ragModePart?.value() ?: "hybrid"
+        } else {
+            null
+        }   
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
         val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
 
@@ -92,8 +112,11 @@ class AnalysisController(
             Mono.fromCallable {
                 val llm = llmConfig.buildStrictJsonModelWithOverride(resolvedLlmPropsOverride)
                 val analyzer = analyzerFactory.createBaselineAnalyzer(llm)
-                analyzer.analyzeBpmnForGdpr(bpmnXml)
-            }.subscribeOn(Schedulers.boundedElastic())
+                analyzer.analyzeBpmnForGdpr(
+                    bpmnXml = bpmnXml,
+                    useRag = useRag,
+                    ragMode = ragMode
+                )            }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
-}
+}   

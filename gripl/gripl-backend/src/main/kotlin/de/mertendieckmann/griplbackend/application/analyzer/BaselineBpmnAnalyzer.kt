@@ -18,7 +18,7 @@ class BaselineBpmnAnalyzer(
     private val bpmnAnalysisAiService = BaselineBpmnAnalysisAiServiceFactory.create(llm, memoryProvider)
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
-    override fun analyzeBpmnForGdpr(bpmnXml: String): AnalysisResponse {
+    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: String): AnalysisResponse {
         val sessionId = UUID.randomUUID().toString()
 
         val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)

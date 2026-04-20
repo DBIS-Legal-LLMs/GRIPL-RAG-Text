@@ -4,23 +4,48 @@ import de.mertendieckmann.griplbackend.ai.PromptBpmnAnalysisAiServiceFactory
 import de.mertendieckmann.griplbackend.ai.SharedChatMemoryProvider
 import de.mertendieckmann.griplbackend.application.BpmnExtractor
 import de.mertendieckmann.griplbackend.application.SafetyNet
+import de.mertendieckmann.griplbackend.adapter.rag.RagApiClient
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import dev.langchain4j.model.chat.ChatModel
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.*
 
 class PromptBpmnAnalyzer(
-    llm: ChatModel
+    llm: ChatModel,
+    private val ragApiClient: RagApiClient
 ): BpmnAnalyzer {
     private val log = KotlinLogging.logger { }
     private val memoryProvider = SharedChatMemoryProvider(50)
     private val bpmnAnalysisAiService = PromptBpmnAnalysisAiServiceFactory.create(llm, memoryProvider)
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
-    override fun analyzeBpmnForGdpr(bpmnXml: String): AnalysisResponse {
+    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: String): AnalysisResponse {
         val sessionId = UUID.randomUUID().toString()
 
         val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)
+        
+        val ragContextMap = mutableMapOf<String, String>()
+
+        if (useRag) {
+            kotlinx.coroutines.runBlocking {
+                bpmnElements.forEach { element ->
+                    val queryText = sequenceOf(element.name, element.documentation, element.poolName, element.laneName)
+                        .filterNotNull()
+                        .filter { it.isNotBlank() }
+                        .joinToString(" - ")
+                    
+                    if (queryText.isNotBlank()) {
+                        try {
+                            val response = ragApiClient.queryRag(queryText, ragMode)
+                            val responseString = response.response
+                            ragContextMap[element.id] = responseString
+                        } catch (e: Exception) {
+                            log.error(e) { "RAG query failed for element ${element.id}" }
+                        }
+                    }
+                }
+            }
+        }
 
         val result = safetyNet.safeGuardAnalysisResultParsing(
             sessionId = sessionId,

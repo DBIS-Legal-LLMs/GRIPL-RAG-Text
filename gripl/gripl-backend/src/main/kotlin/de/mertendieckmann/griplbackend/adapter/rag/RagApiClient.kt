@@ -1,0 +1,40 @@
+package de.mertendieckmann.griplbackend.adapter.rag
+
+import de.mertendieckmann.griplbackend.config.RagApiProperties
+import de.mertendieckmann.griplbackend.model.dto.RagRequest
+import de.mertendieckmann.griplbackend.model.dto.RagResponseWrapper
+import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.reactor.awaitSingle
+import org.springframework.stereotype.Service
+import org.springframework.web.reactive.function.client.WebClient
+
+@Service
+class RagApiClient(
+    webClientBuilder: WebClient.Builder,
+    ragApiProperties: RagApiProperties
+) {
+
+    private val log = KotlinLogging.logger {}
+
+    private val webClient: WebClient = webClientBuilder
+        .baseUrl(ragApiProperties.url)
+        .build()
+
+    /**
+     * Calls the RAG service and returns a typed response.
+     */
+    suspend fun queryRag(queryText: String, ragMode: String): RagResponseWrapper {
+        log.info { "Querying RAG service with mode=$ragMode" }
+
+        return try {
+            webClient.post()
+                .bodyValue(RagRequest(query = queryText, mode = ragMode))
+                .retrieve()
+                .bodyToMono(RagResponseWrapper::class.java)
+                .awaitSingle()
+        } catch (e: Exception) {
+            log.error(e) { "RAG service call failed for query: $queryText" }
+            throw RuntimeException("Failed to query RAG service", e)
+        }
+    }
+}
