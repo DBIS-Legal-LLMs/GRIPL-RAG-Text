@@ -35,6 +35,16 @@ services:
     networks:
       - app
 
+  gripl-rag:
+    build:
+      context: ./gripl/gripl-rag
+      dockerfile: Dockerfile
+    image: ${RAG_IMAGE:-mertend/gripl-rag:latest}
+    container_name: ${RAG_CONTAINER_NAME:-gripl-rag}
+    restart: unless-stopped
+    networks:
+      - app
+
   gripl-postgres:
     image: postgres:15
     container_name: ${POSTGRES_CONTAINER_NAME:-gripl-postgres}

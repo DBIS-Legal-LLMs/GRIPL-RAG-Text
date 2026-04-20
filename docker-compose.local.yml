@@ -48,6 +48,19 @@ services:
     networks:
       - app
 
+  gripl-rag:
+    env_file:
+      - .env.local
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.gripl-rag.rule=Host(`localhost`) && PathPrefix(`/rag`)
+      - traefik.http.routers.gripl-rag.entrypoints=web
+      - traefik.http.middlewares.gripl-rag-strip-prefix.stripprefix.prefixes=/rag
+      - traefik.http.routers.gripl-rag.middlewares=gripl-rag-strip-prefix
+      - traefik.http.services.gripl-rag.loadbalancer.server.port=${RAG_PORT:-8081}
+    networks:
+      - app
+
   gripl-postgres:
     env_file:
       - .env.local
