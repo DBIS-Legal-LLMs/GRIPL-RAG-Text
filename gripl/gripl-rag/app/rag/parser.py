@@ -170,6 +170,7 @@ def parse_rag_response(raw_response: str) -> Dict:
             "label": name,
             "type": entity_type,
             "description": descriptions,
+            "description_text": "\n".join(descriptions),
         })
 
     # -------------------------------
@@ -233,6 +234,7 @@ def parse_rag_response(raw_response: str) -> Dict:
                     "label": node,
                     "type": "Unknown",
                     "description": [],
+                    "description_text": "",
                 })
 
         source_id = entity_map[normalize_key(source)]
