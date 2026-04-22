@@ -9,5 +9,5 @@ data class RagResponseWrapper(
     val query: String,
     val mode: String,
     val status: String,
-    val response: String
+    val response: Map<String, Any>
 )

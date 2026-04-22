@@ -1,8 +1,11 @@
 """
 Request and response schemas for the RAG query API.
 """
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
 from enum import Enum
+from typing import Any
 
 
 class QueryMode(str, Enum):
@@ -26,6 +29,43 @@ class QueryRequest(BaseModel):
     )
 
 
+class RagEntity(BaseModel):
+    id: str
+    label: str
+    type: str
+    description: list[str]
+    description_text: str
+
+
+class RagRelationship(BaseModel):
+    source: str
+    source_label: str
+    target: str
+    target_label: str
+    label: str
+
+
+class RagDocument(BaseModel):
+    id: str
+    reference_id: str | None
+    content: str
+    preview: str
+
+
+class RagMeta(BaseModel):
+    entity_count: int
+    relationship_count: int
+    document_count: int
+
+
+class ParsedRagResponse(BaseModel):
+    """Structured output from the RAG parser."""
+    entities: list[RagEntity]
+    relationships: list[RagRelationship]
+    documents: list[RagDocument]
+    meta: RagMeta
+
+
 class QueryResponse(BaseModel):
     query: str = Field(
         ...,
@@ -35,7 +75,7 @@ class QueryResponse(BaseModel):
         ...,
         description="The search mode that was used.",
     )
-    response: dict = Field(
+    response: ParsedRagResponse = Field(
         ...,
         description="Parsed context with entities, relationships, and documents.",
     )

@@ -1,6 +1,9 @@
 import re
 import json
-from typing import List, Dict, Optional
+import logging
+from typing import List, Dict
+
+logger = logging.getLogger(__name__)
 
 
 def extract_valid_json_objects(text: str) -> List[dict]:
@@ -15,13 +18,15 @@ def extract_valid_json_objects(text: str) -> List[dict]:
     escape = False
 
     for char in text:
-        if char == '\\' and in_string:
-            escape = not escape
+        next_escape = False
+
+        if char == '\\' and in_string and not escape:
+            # Mark that the next character is escaped
+            next_escape = True
         elif char == '"' and not escape:
             in_string = not in_string
-            escape = False
-        else:
-            escape = False
+
+        escape = next_escape
 
         if not in_string:
             if char == '{':
@@ -123,6 +128,14 @@ def parse_rag_response(raw_response: str) -> Dict:
         elif current_section:
             section_texts[current_section] += part
 
+    if not any(section_texts.values()):
+        logger.warning(
+            "parse_rag_response: no known section headers found in response — "
+            "entities/relationships/documents will be empty. "
+            "Raw response (first 500 chars): %s",
+            raw_response[:500],
+        )
+
     # -------------------------------
     # Extract JSON objects
     # -------------------------------
@@ -157,7 +170,6 @@ def parse_rag_response(raw_response: str) -> Dict:
             "label": name,
             "type": entity_type,
             "description": descriptions,
-            "description_text": " ".join(descriptions)
         })
 
     # -------------------------------
@@ -221,13 +233,13 @@ def parse_rag_response(raw_response: str) -> Dict:
                     "label": node,
                     "type": "Unknown",
                     "description": [],
-                    "description_text": ""
                 })
 
         source_id = entity_map[normalize_key(source)]
         target_id = entity_map[normalize_key(target)]
 
-        # Deduplicate relationships
+        # Deduplicate relationships.
+        # BPMN flows are directed edges.
         rel_key = (source_id, target_id)
         if rel_key in seen_rels:
             continue
