@@ -7,6 +7,10 @@ import de.mertendieckmann.griplbackend.application.SafetyNet
 import de.mertendieckmann.griplbackend.adapter.rag.RagApiClient
 import de.mertendieckmann.griplbackend.model.BpmnElement
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
+import de.mertendieckmann.griplbackend.model.dto.RagDocument
+import de.mertendieckmann.griplbackend.model.dto.RagElementContext
+import de.mertendieckmann.griplbackend.model.dto.RagEntity
+import de.mertendieckmann.griplbackend.model.dto.RagRelationship
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import dev.langchain4j.model.chat.ChatModel
@@ -29,36 +33,40 @@ class PromptBpmnAnalyzer(
 
         val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)
 
-        val result = if (useRag) {
-            analyzeWithRag(sessionId, bpmnElements, ragMode)
+        if (useRag) {
+            // RAG-augmented path
+            val ragContextMap = fetchRagContext(bpmnElements, ragMode)
+
+            val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
+                val formattedPrompt = buildCombinedPrompt(bpmnElements, ragContextMap)
+                bpmnAnalysisAiService.analyzeWithRagContext(sessionId, formattedPrompt)
+            }
+
+            val analysisResult = result.first.resolveActivities(bpmnElements)
+            val amountOfRetries = result.second
+            val ragContext = parseRagContextForResponse(ragContextMap, bpmnElements)
+
+            log.info { "BPMN Analysis Result (with RAG): $analysisResult" }
+
+            return AnalysisResponse.fromBpmnAnalysisResult(analysisResult, bpmnElements, amountOfRetries, ragContext)
         } else {
-            // Original path
-            safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
+            // Original path — unchanged from evaluation baseline
+            val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
                 bpmnAnalysisAiService.analyze(sessionId, bpmnElements)
             }
+
+            val analysisResult = result.first.resolveActivities(bpmnElements)
+            val amountOfRetries = result.second
+
+            log.info { "BPMN Analysis Result: $analysisResult" }
+
+            return AnalysisResponse.fromBpmnAnalysisResult(analysisResult, bpmnElements, amountOfRetries)
         }
-
-        val analysisResult = result.first.resolveActivities(bpmnElements)
-        val amountOfRetries = result.second
-
-        log.info { "BPMN Analysis Result: $analysisResult" }
-
-        return AnalysisResponse.fromBpmnAnalysisResult(analysisResult, bpmnElements, amountOfRetries)
     }
 
     // -------------------------------------------------------------------------
-    // RAG path
+    // RAG context retrieval
     // -------------------------------------------------------------------------
-
-    private fun analyzeWithRag(
-        sessionId: String,
-        bpmnElements: Set<BpmnElement>,
-        ragMode: String
-    ) = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
-        val ragContextMap = fetchRagContext(bpmnElements, ragMode)
-        val formattedPrompt = buildCombinedPrompt(bpmnElements, ragContextMap)
-        bpmnAnalysisAiService.analyzeWithRagContext(sessionId, formattedPrompt)
-    }
 
     private fun fetchRagContext(
         bpmnElements: Set<BpmnElement>,
@@ -89,6 +97,10 @@ class PromptBpmnAnalyzer(
         log.info { "RAG context retrieved for ${ragContextMap.size} / ${bpmnElements.size} elements" }
         return ragContextMap
     }
+
+    // -------------------------------------------------------------------------
+    // LLM prompt builder
+    // -------------------------------------------------------------------------
 
     /**
      * Combines the RAG-retrieved legal context with the original BPMN element
@@ -166,5 +178,64 @@ class PromptBpmnAnalyzer(
 
         appendLine("=== BPMN PROCESS ELEMENTS ===")
         append(bpmnElements.toString())
+    }
+
+    // -------------------------------------------------------------------------
+    // RAG context → frontend DTO
+    // -------------------------------------------------------------------------
+
+    /**
+     * Parses the raw JSON context map into typed [RagElementContext] objects
+     * for inclusion in the API response to the frontend.
+     */
+    private fun parseRagContextForResponse(
+        ragContextMap: Map<String, String>,
+        bpmnElements: Set<BpmnElement>
+    ): Map<String, RagElementContext> {
+        val elementById = bpmnElements.associateBy { it.id }
+        val result = mutableMapOf<String, RagElementContext>()
+
+        ragContextMap.forEach { (elementId, rawJson) ->
+            try {
+                val ctx = objectMapper.readValue<Map<String, Any>>(rawJson)
+
+                @Suppress("UNCHECKED_CAST")
+                val entities = (ctx["entities"] as? List<Map<String, Any>> ?: emptyList()).map { e ->
+                    RagEntity(
+                        label = (e["label"] as? String) ?: "",
+                        type = (e["type"] as? String) ?: "Unknown",
+                        description = (e["description_text"] as? String) ?: ""
+                    )
+                }
+
+                @Suppress("UNCHECKED_CAST")
+                val relationships = (ctx["relationships"] as? List<Map<String, Any>> ?: emptyList()).map { r ->
+                    RagRelationship(
+                        source = (r["source_label"] as? String) ?: "",
+                        target = (r["target_label"] as? String) ?: "",
+                        label = (r["label"] as? String) ?: "relates to"
+                    )
+                }
+
+                @Suppress("UNCHECKED_CAST")
+                val documents = (ctx["documents"] as? List<Map<String, Any>> ?: emptyList()).map { d ->
+                    RagDocument(
+                        content = (d["content"] as? String) ?: "",
+                        preview = (d["preview"] as? String) ?: (d["content"] as? String) ?: ""
+                    )
+                }
+
+                result[elementId] = RagElementContext(
+                    activityName = elementById[elementId]?.name,
+                    entities = entities,
+                    relationships = relationships,
+                    documents = documents
+                )
+            } catch (e: Exception) {
+                log.warn { "Failed to parse RAG context for element $elementId: ${e.message}" }
+            }
+        }
+
+        return result
     }
 }

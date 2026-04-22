@@ -6,7 +6,8 @@ import de.mertendieckmann.griplbackend.model.analysis.BpmnAnalysisResult
 
 data class AnalysisResponse(
     val criticalElements: List<CriticalElement>,
-    val amountOfRetries: Int? = null
+    val amountOfRetries: Int? = null,
+    val ragContext: Map<String, RagElementContext>? = null
 ) {
     data class CriticalElement(
         val id: String,
@@ -15,7 +16,12 @@ data class AnalysisResponse(
     )
 
     companion object {
-        fun fromBpmnAnalysisResult(result: BpmnAnalysisResult, bpmnElements: Set<BpmnElement>, amountOfRetries: Int): AnalysisResponse {
+        fun fromBpmnAnalysisResult(
+            result: BpmnAnalysisResult,
+            bpmnElements: Set<BpmnElement>,
+            amountOfRetries: Int,
+            ragContext: Map<String, RagElementContext>? = null
+        ): AnalysisResponse {
             val elements = result.elements.map { element ->
                 CriticalElement(
                     id = element.id,
@@ -26,7 +32,8 @@ data class AnalysisResponse(
 
             return AnalysisResponse(
                 criticalElements = elements,
-                amountOfRetries = amountOfRetries
+                amountOfRetries = amountOfRetries,
+                ragContext = ragContext
             )
         }
 
@@ -37,3 +44,27 @@ data class AnalysisResponse(
         }
     }
 }
+
+data class RagElementContext(
+    val activityName: String?,
+    val entities: List<RagEntity>,
+    val relationships: List<RagRelationship>,
+    val documents: List<RagDocument>
+)
+
+data class RagEntity(
+    val label: String,
+    val type: String,
+    val description: String
+)
+
+data class RagRelationship(
+    val source: String,
+    val target: String,
+    val label: String
+)
+
+data class RagDocument(
+    val content: String,
+    val preview: String
+)
