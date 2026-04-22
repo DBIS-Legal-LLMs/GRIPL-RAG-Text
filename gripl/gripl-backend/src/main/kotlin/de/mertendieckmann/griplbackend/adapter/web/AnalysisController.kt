@@ -61,11 +61,7 @@ class AnalysisController(
     ): Mono<ResponseEntity<AnalysisResponse>> {
 
         val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
-        val ragMode = if (useRag) {
-            ragModePart?.value() ?: "hybrid"
-        } else {
-            null
-        }
+        val ragMode = ragModePart?.value() ?: "hybrid"
 
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
         val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
@@ -100,11 +96,7 @@ class AnalysisController(
     ): Mono<ResponseEntity<AnalysisResponse>> {
 
         val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
-        val ragMode = if (useRag) {
-            ragModePart?.value() ?: "hybrid"
-        } else {
-            null
-        }   
+        val ragMode = ragModePart?.value() ?: "hybrid"   
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
         val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
 
