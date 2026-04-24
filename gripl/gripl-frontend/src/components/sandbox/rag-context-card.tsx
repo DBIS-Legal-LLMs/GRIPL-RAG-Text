@@ -102,14 +102,20 @@ export default function RagContextCard({ ragContext, selectedElementId }: RagCon
                                     <BookOpen className="h-3 w-3" />
                                     Legal Excerpts
                                 </div>
-                                <div className="space-y-1">
+                                <div className="space-y-2">
                                     {ctx.documents.map((doc, i) => (
-                                        <blockquote
-                                            key={i}
-                                            className="text-xs text-muted-foreground border-l-2 border-primary/30 pl-2 italic"
-                                        >
-                                            {doc.preview}
-                                        </blockquote>
+                                        <div key={i} className="space-y-0.5">
+                                            <blockquote
+                                                className="text-xs text-muted-foreground border-l-2 border-primary/30 pl-2 italic"
+                                            >
+                                                {doc.preview}
+                                            </blockquote>
+                                            {doc.sourceDocument && (
+                                                <p className="text-xs text-primary/70 pl-2 font-medium">
+                                                    📄 {doc.sourceDocument.replace(/[_-]/g, " ")}
+                                                </p>
+                                            )}
+                                        </div>
                                     ))}
                                 </div>
                             </div>

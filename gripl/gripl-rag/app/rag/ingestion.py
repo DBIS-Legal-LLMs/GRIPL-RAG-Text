@@ -53,7 +53,7 @@ async def ingest_documents(
 
             print(f"   Characters: {len(text):,}")
 
-            await rag.ainsert(text)
+            await rag.ainsert(text, ids=[doc_path.stem])
 
             print(f"   Done!")
             stats["successful"] += 1

@@ -35,4 +35,5 @@ export interface RagRelationship {
 export interface RagDocument {
     content: string;
     preview: string;
+    sourceDocument?: string | null;
 }

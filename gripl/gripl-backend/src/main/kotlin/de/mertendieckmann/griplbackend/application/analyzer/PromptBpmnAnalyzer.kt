@@ -221,7 +221,8 @@ class PromptBpmnAnalyzer(
                 val documents = (ctx["documents"] as? List<Map<String, Any>> ?: emptyList()).map { d ->
                     RagDocument(
                         content = (d["content"] as? String) ?: "",
-                        preview = (d["preview"] as? String) ?: (d["content"] as? String) ?: ""
+                        preview = (d["preview"] as? String) ?: (d["content"] as? String) ?: "",
+                        sourceDocument = (d["reference_id"] as? String)
                     )
                 }
 

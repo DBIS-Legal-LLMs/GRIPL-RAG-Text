@@ -191,7 +191,13 @@ def parse_rag_response(raw_response: str) -> Dict:
 
         result["documents"].append({
             "id": doc_id,
-            "reference_id": obj.get("reference_id") or None,
+            "reference_id": (
+                obj.get("reference_id")
+                or obj.get("doc_id")
+                or obj.get("source_id")
+                or obj.get("file_name")
+                or None
+            ),
             "content": content,
             "preview": make_preview(content)
         })

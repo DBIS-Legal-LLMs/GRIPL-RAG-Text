@@ -31,6 +31,7 @@ app = FastAPI(
         "legal documents and returns relevant context."
     ),
     version="0.1.0",
+    root_path="/rag",
 )
 
 # ---------------------------------------------------------------------------

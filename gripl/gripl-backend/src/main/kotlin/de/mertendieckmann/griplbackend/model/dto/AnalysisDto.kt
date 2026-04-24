@@ -66,5 +66,6 @@ data class RagRelationship(
 
 data class RagDocument(
     val content: String,
-    val preview: String
+    val preview: String,
+    val sourceDocument: String? = null
 )
