@@ -11,6 +11,12 @@ export interface CriticalElement {
     id: string;
     name: string;
     reason: string;
+    references?: LlmReference[];
+}
+
+export interface LlmReference {
+    exactText: string;
+    sourceDocument?: string | null;
 }
 
 export interface RagElementContext {

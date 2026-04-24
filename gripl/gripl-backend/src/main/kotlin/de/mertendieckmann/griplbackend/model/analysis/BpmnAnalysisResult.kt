@@ -19,8 +19,18 @@ data class BpmnAnalysisResult(
         @Description("The detailed reason why the Activity Element is relevant for GDPR compliance and why you think personal data is processed.")
         val reason: String,
         @Description("Indicates whether the Activity Element is relevant for GDPR compliance")
-        val isRelevant: Boolean = true
-    )
+        val isRelevant: Boolean = true,
+        @Description("Verbatim text passages from the retrieved legal excerpts that directly supported this classification. Only populated when RAG context was provided.")
+        val references: List<Reference> = emptyList()
+    ) {
+        @Description("A verbatim citation from a legal document retrieved via RAG that supported the GDPR classification decision.")
+        data class Reference(
+            @Description("The exact text passage copied verbatim from the Supporting Legal Excerpts section — not paraphrased or reformulated.")
+            val exactText: String,
+            @Description("The source document identifier from the [Source: ...] label preceding the excerpt, or null if not available.")
+            val sourceDocument: String? = null
+        )
+    }
 
     /**
      * Resolves (possibly) incomplete activity IDs to existing full IDs from the provided BPMN elements.

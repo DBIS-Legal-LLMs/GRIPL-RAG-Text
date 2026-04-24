@@ -160,7 +160,12 @@ class PromptBpmnAnalyzer(
                     appendLine("Supporting Legal Excerpts:")
                     docs.take(3).forEach { d ->
                         val preview = d["preview"] ?: d["content"] ?: ""
-                        appendLine("  \"$preview\"")
+                        val sourceDoc = d["reference_id"] as? String
+                        if (sourceDoc != null) {
+                            appendLine("  [Source: $sourceDoc] \"$preview\"")
+                        } else {
+                            appendLine("  \"$preview\"")
+                        }
                     }
                 }
 

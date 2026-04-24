@@ -58,9 +58,33 @@ export default function Home() {
                               <tbody>
                               {analysisResult.criticalElements.map((element, index) => {
                                   const isSelected = element.id === selectedElementId
-                                  return <tr key={index} className={`border-t ${isSelected ? "bg-destructive/50" : ""}`}>
-                                      <td className="font-medium text-sm mb-1 p-2">{element.name}</td>
-                                      <td className="text-sm p-2">{element.reason || "No reasoning provided"}</td>
+                                  const hasRefs = element.references && element.references.length > 0
+                                  return <tr key={index} className={`border-t align-top ${isSelected ? "bg-destructive/50" : ""}`}>
+                                      <td className="font-medium text-sm p-2 whitespace-nowrap">{element.name}</td>
+                                      <td className="text-sm p-2">
+                                          <p>{element.reason || "No reasoning provided"}</p>
+                                          {hasRefs && (
+                                              <details className="mt-2">
+                                                  <summary className="cursor-pointer text-xs font-semibold text-primary/80 hover:text-primary select-none w-fit">
+                                                      📎 References ({element.references!.length})
+                                                  </summary>
+                                                  <div className="mt-1.5 space-y-2 pl-1">
+                                                      {element.references!.map((ref, ri) => (
+                                                          <div key={ri} className="border-l-2 border-primary/30 pl-2 space-y-0.5">
+                                                              <blockquote className="text-xs text-muted-foreground italic">
+                                                                  &ldquo;{ref.exactText}&rdquo;
+                                                              </blockquote>
+                                                              {ref.sourceDocument && (
+                                                                  <p className="text-xs text-primary/70 font-medium">
+                                                                      📄 {ref.sourceDocument.replace(/[_-]/g, " ")}
+                                                                  </p>
+                                                              )}
+                                                          </div>
+                                                      ))}
+                                                  </div>
+                                              </details>
+                                          )}
+                                      </td>
                                   </tr>
                               })}
                               </tbody>

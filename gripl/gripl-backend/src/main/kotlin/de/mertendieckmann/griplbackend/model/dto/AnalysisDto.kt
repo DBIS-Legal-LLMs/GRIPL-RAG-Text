@@ -12,7 +12,8 @@ data class AnalysisResponse(
     data class CriticalElement(
         val id: String,
         val name: String?,
-        val reason: String
+        val reason: String,
+        val references: List<LlmReference> = emptyList()
     )
 
     companion object {
@@ -26,7 +27,10 @@ data class AnalysisResponse(
                 CriticalElement(
                     id = element.id,
                     name = bpmnElements.find { it.id == element.id }?.name,
-                    reason = element.reason
+                    reason = element.reason,
+                    references = element.references.map { ref ->
+                        LlmReference(exactText = ref.exactText, sourceDocument = ref.sourceDocument)
+                    }
                 )
             }
 
@@ -62,6 +66,11 @@ data class RagRelationship(
     val source: String,
     val target: String,
     val label: String
+)
+
+data class LlmReference(
+    val exactText: String,
+    val sourceDocument: String? = null
 )
 
 data class RagDocument(

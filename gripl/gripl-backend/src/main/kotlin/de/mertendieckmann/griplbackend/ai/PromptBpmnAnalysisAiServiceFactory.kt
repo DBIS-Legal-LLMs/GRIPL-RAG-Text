@@ -41,7 +41,13 @@ object PromptBpmnAnalysisAiServiceFactory {
 
                     Do **not** classify an activity as GDPR‑relevant when it only performs administrative or logistic tasks that do not involve personal data. Examples include picking or packing goods, routing vehicles without using specific addresses, printing generic pick lists, moving items in inventory, or checking if a document exists without viewing its contents. Likewise, activities using truly aggregated or irreversibly anonymised data can be ignored if no individual can be reidentified.
 
-                    In your output, return only the IDs of activities you classify as GDPR‑relevant. For each, provide a clear explanation in englisch using the activity’s name and description to justify why it processes personal data. Do not reference element IDs in your explanation; use the activity names instead. Exclude from your result any activities that do not process personal data and any elements that are not activity/task elements.
+                    In your output, return only the IDs of activities you classify as GDPR-relevant. For each, provide a clear explanation in english using the activity's name and description to justify why it processes personal data. Do not reference element IDs in your explanation; use the activity names instead. Exclude from your result any activities that do not process personal data and any elements that are not activity/task elements.
+
+                    CITATIONS (applies only when "=== RETRIEVED GDPR KNOWLEDGE ===" is present in your input):
+                    For each GDPR-relevant activity, you must also populate the `references` field with the specific text passages from the "Supporting Legal Excerpts" sections that directly supported your classification decision. Each reference must be an object with:
+                    - `exactText`: Copy the passage verbatim exactly as it appears after the quote marks in the excerpt — do not paraphrase, summarise, or reformulate it in any way.
+                    - `sourceDocument`: The identifier shown in the "[Source: ...]" label that precedes the excerpt. If no source label was present, set this to null.
+                    Only include excerpts that actually influenced your decision for that specific activity. If no text excerpts were relevant for an activity, return an empty array for `references`.
                 """.trimIndent()
             )
         })
