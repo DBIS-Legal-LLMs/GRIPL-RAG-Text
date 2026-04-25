@@ -15,6 +15,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import dev.langchain4j.model.chat.ChatModel
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.util.*
 
 class PromptBpmnAnalyzer(
@@ -70,32 +74,42 @@ class PromptBpmnAnalyzer(
 
     private fun fetchRagContext(
         bpmnElements: Set<BpmnElement>,
-        ragMode: String
+        ragMode: String,
+        maxConcurrency: Int = 8
     ): Map<String, String> {
-        val ragContextMap = mutableMapOf<String, String>()
+        val semaphore = Semaphore(maxConcurrency)
 
-        kotlinx.coroutines.runBlocking {
-            bpmnElements.forEach { element ->
-                val queryText = sequenceOf(
-                    element.name, element.documentation, element.poolName, element.laneName
-                )
-                    .filterNotNull()
-                    .filter { it.isNotBlank() }
-                    .joinToString(" - ")
+        val result = kotlinx.coroutines.runBlocking {
+            bpmnElements
+                .map { element ->
+                    async {
+                        val queryText = sequenceOf(
+                            element.name, element.documentation, element.poolName, element.laneName
+                        )
+                            .filterNotNull()
+                            .filter { it.isNotBlank() }
+                            .joinToString(" - ")
 
-                if (queryText.isNotBlank()) {
-                    try {
-                        val response = ragApiClient.queryRag(queryText, ragMode)
-                        ragContextMap[element.id] = objectMapper.writeValueAsString(response.response)
-                    } catch (e: Exception) {
-                        log.error(e) { "RAG query failed for element ${element.id}" }
+                        if (queryText.isNotBlank()) {
+                            try {
+                                semaphore.withPermit {
+                                    val response = ragApiClient.queryRag(queryText, ragMode)
+                                    element.id to objectMapper.writeValueAsString(response.response)
+                                }
+                            } catch (e: Exception) {
+                                log.error(e) { "RAG query failed for element ${element.id}" }
+                                null
+                            }
+                        } else null
                     }
                 }
-            }
+                .awaitAll()
+                .filterNotNull()
+                .toMap()
         }
 
-        log.info { "RAG context retrieved for ${ragContextMap.size} / ${bpmnElements.size} elements" }
-        return ragContextMap
+        log.info { "RAG context retrieved for ${result.size} / ${bpmnElements.size} elements" }
+        return result
     }
 
     // -------------------------------------------------------------------------
