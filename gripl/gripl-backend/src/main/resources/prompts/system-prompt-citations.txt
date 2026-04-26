@@ -1,0 +1,4 @@
+CITATIONS: For each GDPR-relevant activity, you must also populate the `references` field with the specific text passages from the "Supporting Legal Excerpts" sections that directly supported your classification decision. Each reference must be an object with:
+- `exactText`: Copy the passage verbatim exactly as it appears after the quote marks in the excerpt — do not paraphrase, summarise, or reformulate it in any way.
+- `sourceDocument`: The identifier shown in the "[Source: ...]" label that precedes the excerpt. If no source label was present, set this to null.
+Only include excerpts that actually influenced your decision for that specific activity. If no text excerpts were relevant for an activity, return an empty array for `references`.

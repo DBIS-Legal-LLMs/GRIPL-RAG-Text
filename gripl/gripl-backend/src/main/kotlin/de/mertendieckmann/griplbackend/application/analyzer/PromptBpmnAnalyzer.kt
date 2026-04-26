@@ -29,7 +29,8 @@ class PromptBpmnAnalyzer(
     private val log = KotlinLogging.logger { }
     private val objectMapper = ObjectMapper()
     private val memoryProvider = SharedChatMemoryProvider(50)
-    private val bpmnAnalysisAiService = PromptBpmnAnalysisAiServiceFactory.create(llm, memoryProvider)
+    private val bpmnAnalysisAiServiceWithRag = PromptBpmnAnalysisAiServiceFactory.create(llm, memoryProvider)
+    private val bpmnAnalysisAiServiceNoRag = PromptBpmnAnalysisAiServiceFactory.createWithoutRag(llm, memoryProvider)
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
     override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: String): AnalysisResponse {
@@ -43,7 +44,7 @@ class PromptBpmnAnalyzer(
 
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
                 val formattedPrompt = buildCombinedPrompt(bpmnElements, ragContextMap)
-                bpmnAnalysisAiService.analyzeWithRagContext(sessionId, formattedPrompt)
+                bpmnAnalysisAiServiceWithRag.analyzeWithRagContext(sessionId, formattedPrompt)
             }
 
             val analysisResult = result.first.resolveActivities(bpmnElements)
@@ -56,7 +57,7 @@ class PromptBpmnAnalyzer(
         } else {
             // Original path — unchanged from evaluation baseline
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
-                bpmnAnalysisAiService.analyze(sessionId, bpmnElements)
+                bpmnAnalysisAiServiceNoRag.analyze(sessionId, bpmnElements)
             }
 
             val analysisResult = result.first.resolveActivities(bpmnElements)
@@ -139,8 +140,8 @@ class PromptBpmnAnalyzer(
                 val ctx = objectMapper.readValue<Map<String, Any>>(rawJson)
 
                 @Suppress("UNCHECKED_CAST")
-                (ctx["entities"] as? List<Map<String, Any>> ?: emptyList()).forEach { e ->
-                    val label = (e["label"] as? String) ?: return@forEach
+                (ctx["entities"] as? List<Map<String, Any>> ?: emptyList()).forEach eachEntity@{ e ->
+                    val label = (e["label"] as? String) ?: return@eachEntity
                     if (seenEntityLabels.add(label)) allEntities += e
                 }
 
@@ -151,8 +152,8 @@ class PromptBpmnAnalyzer(
                 }
 
                 @Suppress("UNCHECKED_CAST")
-                (ctx["documents"] as? List<Map<String, Any>> ?: emptyList()).forEach { d ->
-                    val docId = (d["reference_id"] as? String) ?: (d["preview"] as? String) ?: return@forEach
+                (ctx["documents"] as? List<Map<String, Any>> ?: emptyList()).forEach eachDoc@{ d ->
+                    val docId = (d["reference_id"] as? String) ?: (d["preview"] as? String) ?: return@eachDoc
                     if (seenDocIds.add(docId)) allDocs += d
                 }
             } catch (e: Exception) {
