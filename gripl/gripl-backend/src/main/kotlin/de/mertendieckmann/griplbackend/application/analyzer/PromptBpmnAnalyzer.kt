@@ -117,81 +117,94 @@ class PromptBpmnAnalyzer(
     // -------------------------------------------------------------------------
 
     /**
-     * Combines the RAG-retrieved legal context with the original BPMN element
-     * representation (Set.toString()) into a single user message.
-     *
-     * The BPMN section uses the same serialisation LangChain4j applied in the
-     * no-RAG path so the model sees identical element data in both modes.
+     * Combines the RAG-retrieved legal context with the BPMN elements into a single prompt.
+     * Context is deduplicated across all elements to avoid repeating the same GDPR
+     * entities/documents multiple times, which would bloat the token count unnecessarily.
      */
     private fun buildCombinedPrompt(
         bpmnElements: Set<BpmnElement>,
         ragContextMap: Map<String, String>
     ): String = buildString {
-        appendLine("=== RETRIEVED GDPR KNOWLEDGE ===")
-        appendLine(
-            "The following knowledge was retrieved from a GDPR legal knowledge graph. " +
-            "Each section maps to a BPMN activity. Use this context when assessing " +
-            "whether each activity processes personal data."
-        )
-        appendLine()
+        // Deduplicated pools across all elements
+        val seenEntityLabels = mutableSetOf<String>()
+        val seenRelKeys = mutableSetOf<String>()
+        val seenDocIds = mutableSetOf<String>()
 
-        val elementById = bpmnElements.associateBy { it.id }
-        ragContextMap.entries.forEachIndexed { index, (elementId, rawJson) ->
-            val activityLabel = elementById[elementId]?.name?.takeIf { it.isNotBlank() } ?: elementId
-            appendLine("--- Activity ${index + 1}: \"$activityLabel\" ---")
+        val allEntities = mutableListOf<Map<String, Any>>()
+        val allRels = mutableListOf<Map<String, Any>>()
+        val allDocs = mutableListOf<Map<String, Any>>()
 
+        ragContextMap.values.forEach { rawJson ->
             try {
                 val ctx = objectMapper.readValue<Map<String, Any>>(rawJson)
 
                 @Suppress("UNCHECKED_CAST")
-                val entities = ctx["entities"] as? List<Map<String, Any>> ?: emptyList()
-                if (entities.isNotEmpty()) {
-                    appendLine("Relevant GDPR Entities:")
-                    entities.take(10).forEach { e ->
-                        val label = e["label"] ?: ""
-                        val type  = e["type"]  ?: ""
-                        val desc  = (e["description_text"] as? String)
-                            ?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""
-                        appendLine("  • [$type] $label$desc")
-                    }
+                (ctx["entities"] as? List<Map<String, Any>> ?: emptyList()).forEach { e ->
+                    val label = (e["label"] as? String) ?: return@forEach
+                    if (seenEntityLabels.add(label)) allEntities += e
                 }
 
                 @Suppress("UNCHECKED_CAST")
-                val rels = ctx["relationships"] as? List<Map<String, Any>> ?: emptyList()
-                if (rels.isNotEmpty()) {
-                    appendLine("Key Relationships:")
-                    rels.take(8).forEach { r ->
-                        val src   = r["source_label"] ?: ""
-                        val tgt   = r["target_label"] ?: ""
-                        val label = (r["label"] as? String)?.takeIf { it.isNotBlank() } ?: "relates to"
-                        appendLine("  • $src → $tgt ($label)")
-                    }
+                (ctx["relationships"] as? List<Map<String, Any>> ?: emptyList()).forEach { r ->
+                    val key = "${r["source_label"]}|${r["label"]}|${r["target_label"]}"
+                    if (seenRelKeys.add(key)) allRels += r
                 }
 
                 @Suppress("UNCHECKED_CAST")
-                val docs = ctx["documents"] as? List<Map<String, Any>> ?: emptyList()
-                if (docs.isNotEmpty()) {
-                    appendLine("Supporting Legal Excerpts:")
-                    docs.take(3).forEach { d ->
-                        val preview = d["preview"] ?: d["content"] ?: ""
-                        val sourceDoc = d["reference_id"] as? String
-                        if (sourceDoc != null) {
-                            appendLine("  [Source: $sourceDoc] \"$preview\"")
-                        } else {
-                            appendLine("  \"$preview\"")
-                        }
-                    }
+                (ctx["documents"] as? List<Map<String, Any>> ?: emptyList()).forEach { d ->
+                    val docId = (d["reference_id"] as? String) ?: (d["preview"] as? String) ?: return@forEach
+                    if (seenDocIds.add(docId)) allDocs += d
                 }
-
-                if (entities.isEmpty() && rels.isEmpty() && docs.isEmpty()) {
-                    appendLine("  (No specific context retrieved for this activity.)")
-                }
-
             } catch (e: Exception) {
-                log.warn { "Failed to parse RAG context JSON for element $elementId: ${e.message}" }
-                appendLine("  (RAG context unavailable for this activity.)")
+                log.warn { "Failed to parse RAG context JSON: ${e.message}" }
             }
+        }
 
+        appendLine("=== RETRIEVED GDPR KNOWLEDGE ===")
+        appendLine(
+            "The following unique knowledge was retrieved from a GDPR legal knowledge graph. " +
+            "Use this context when assessing whether each BPMN activity processes personal data."
+        )
+        appendLine()
+
+        if (allEntities.isNotEmpty()) {
+            appendLine("Relevant GDPR Entities:")
+            allEntities.take(20).forEach { e ->
+                val label = e["label"] ?: ""
+                val type  = e["type"]  ?: ""
+                val desc  = (e["description_text"] as? String)?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""
+                appendLine("  • [$type] $label$desc")
+            }
+            appendLine()
+        }
+
+        if (allRels.isNotEmpty()) {
+            appendLine("Key Relationships:")
+            allRels.take(15).forEach { r ->
+                val src   = r["source_label"] ?: ""
+                val tgt   = r["target_label"] ?: ""
+                val label = (r["label"] as? String)?.takeIf { it.isNotBlank() } ?: "relates to"
+                appendLine("  • $src → $tgt ($label)")
+            }
+            appendLine()
+        }
+
+        if (allDocs.isNotEmpty()) {
+            appendLine("Supporting Legal Excerpts:")
+            allDocs.take(5).forEach { d ->
+                val preview = d["preview"] ?: d["content"] ?: ""
+                val sourceDoc = d["reference_id"] as? String
+                if (sourceDoc != null) {
+                    appendLine("  [Source: $sourceDoc] \"$preview\"")
+                } else {
+                    appendLine("  \"$preview\"")
+                }
+            }
+            appendLine()
+        }
+
+        if (allEntities.isEmpty() && allRels.isEmpty() && allDocs.isEmpty()) {
+            appendLine("  (No GDPR context retrieved.)")
             appendLine()
         }
 

@@ -25,3 +25,4 @@ gripl/gripl-rag/.env
 
 # Personal notes
 RUNNING.md
+.claude/settings.local.json
