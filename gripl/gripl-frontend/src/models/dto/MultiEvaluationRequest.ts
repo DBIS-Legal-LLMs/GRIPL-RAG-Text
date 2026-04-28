@@ -6,6 +6,9 @@ export interface MultiEvaluationRequest {
     seed?: number;
     maxConcurrent: number | null;
     repetitions?: number;
+    useRag: boolean;
+    ragMode: string;
+    evaluateRag: boolean;
 }
 
 export interface ModelRunConfig {

@@ -12,6 +12,23 @@ export interface EvaluationMetadataReport {
     markdown: string;
 }
 
+export interface TestCaseRagMetrics {
+    contextPrecision: number | null;
+    faithfulness: number | null;
+    answerRelevancy: number | null;
+    sampleCount: number;
+    failedCount: number;
+}
+
+export interface RagSummaryMetrics {
+    contextPrecisionMean: number | null;
+    faithfulnessMean: number | null;
+    answerRelevancyMean: number | null;
+    evaluatedTestCases: number;
+    totalSamples: number;
+    failedSamples: number;
+}
+
 export interface TestCaseReport {
     type: "testCase";
     testCaseId: number;
@@ -26,6 +43,7 @@ export interface TestCaseReport {
     isSuccessful: boolean;
     result: { value: string; reason?: string }[];
     amountOfRetries: number | null;
+    ragMetrics?: TestCaseRagMetrics | null;
     markdown: string;
 }
 
@@ -44,6 +62,7 @@ export interface EvaluationReportSummary {
     totalFalsePositives: number;
     totalFalseNegatives: number;
     totalTrueNegatives: number;
+    ragMetrics?: RagSummaryMetrics | null;
     markdown: string;
 }
 

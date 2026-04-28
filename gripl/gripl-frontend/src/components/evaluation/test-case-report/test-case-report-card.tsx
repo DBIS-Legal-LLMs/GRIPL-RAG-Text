@@ -11,6 +11,7 @@ import TestCaseReportCardPreview from "@/components/evaluation/test-case-report/
 import TestCaseReportCardReasoning from "@/components/evaluation/test-case-report/test-case-report-card-reasoning";
 import TestCaseReportCardOverview from "@/components/evaluation/test-case-report/test-case-report-card-overview";
 import TestCaseReportCardComparison from "@/components/evaluation/test-case-report/test-case-report-card-comparison";
+import RagMetricsCard from "@/components/evaluation/rag-metrics-card";
 
 interface TestCaseReportCardProps {
     report: TestCaseReport
@@ -60,6 +61,12 @@ export default function TestCaseReportCard({ report }: TestCaseReportCardProps) 
                         <Separator />
                         <TestCaseReportCardComparison report={report} />
                         <TestCaseReportCardPreview report={report} />
+                        {report.ragMetrics && (
+                            <>
+                                <Separator />
+                                <RagMetricsCard testCase={report.ragMetrics} />
+                            </>
+                        )}
                         <Separator />
                         <TestCaseReportCardReasoning report={report} />
                     </CardContent>

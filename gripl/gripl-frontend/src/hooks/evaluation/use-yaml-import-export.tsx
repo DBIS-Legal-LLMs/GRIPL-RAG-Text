@@ -14,6 +14,9 @@ export function useYamlImportExport(props: {
     seed: number | null;
     maxConcurrent: number;
     repetitions: number;
+    useRag: boolean;
+    ragMode: string;
+    evaluateRag: boolean;
     setDefaultEndpointChoice: (v: "preset" | "custom") => void;
     setDefaultPresetEndpoint: (v: string) => void;
     setDefaultCustomEndpoint: (v: string) => void;
@@ -22,6 +25,9 @@ export function useYamlImportExport(props: {
     setRepetitions: (v: number) => void;
     setSelectedDatasets: (v: number[]) => void;
     setModels: (v: ModelRowState[]) => void;
+    setUseRag: (v: boolean) => void;
+    setRagMode: (v: string) => void;
+    setEvaluateRag: (v: boolean) => void;
 }) {
     const {
         availableEvaluationEndpoints,
@@ -31,6 +37,9 @@ export function useYamlImportExport(props: {
         seed,
         maxConcurrent,
         repetitions,
+        useRag,
+        ragMode,
+        evaluateRag,
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
         setDefaultCustomEndpoint,
@@ -39,6 +48,9 @@ export function useYamlImportExport(props: {
         setRepetitions,
         setSelectedDatasets,
         setModels,
+        setUseRag,
+        setRagMode,
+        setEvaluateRag,
     } = props;
 
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -94,6 +106,10 @@ export function useYamlImportExport(props: {
         if (typeof reps === "number" && Number.isFinite(reps) && reps > 0) {
             setRepetitions(reps);
         }
+
+        if (typeof cfg?.useRag === "boolean") setUseRag(cfg.useRag);
+        if (typeof cfg?.ragMode === "string" && cfg.ragMode) setRagMode(cfg.ragMode);
+        if (typeof cfg?.evaluateRag === "boolean") setEvaluateRag(cfg.evaluateRag);
 
         if (modelItems.length > 0) {
             const next: ModelRowState[] = modelItems.map((model: any, idx: number) => {
@@ -174,6 +190,9 @@ export function useYamlImportExport(props: {
             repetitions: repetitions || 1,
             models: dtoModels,
             datasets: selectedDatasets,
+            useRag,
+            ragMode,
+            evaluateRag: useRag && evaluateRag,
         };
     }
 

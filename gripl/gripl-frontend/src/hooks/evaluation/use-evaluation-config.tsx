@@ -39,6 +39,11 @@ export function useEvaluationConfig(
     const [models, setModels] = useState<ModelRowState[]>(() => [newModelRow(1)]);
     const [selectedDatasets, setSelectedDatasets] = useState<number[]>([]);
 
+    // RAG configuration
+    const [useRag, setUseRag] = useState<boolean>(false);
+    const [ragMode, setRagMode] = useState<string>("hybrid");
+    const [evaluateRag, setEvaluateRag] = useState<boolean>(true);
+
     useEffect(() => {
         fetchAnalysisEndpoints().then((eps) => {
             setAvailableEvaluationEndpoints(eps);
@@ -84,10 +89,13 @@ export function useEvaluationConfig(
             seed: seed || undefined,
             maxConcurrent: maxConcurrent,
             repetitions: repetitions,
+            useRag,
+            ragMode,
+            evaluateRag: useRag && evaluateRag,
         };
 
         onMultiConfigChanged(multi);
-    }, [models, selectedDatasets, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, onMultiConfigChanged]);
+    }, [models, selectedDatasets, effectiveDefaultEndpoint, seed, maxConcurrent, repetitions, useRag, ragMode, evaluateRag, onMultiConfigChanged]);
 
     function addModel() {
         setModels((prev) => [...prev, newModelRow(prev.length + 1)]);
@@ -128,6 +136,9 @@ export function useEvaluationConfig(
         models,
         selectedDatasets,
         effectiveDefaultEndpoint,
+        useRag,
+        ragMode,
+        evaluateRag,
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
         setDefaultCustomEndpoint,
@@ -136,6 +147,9 @@ export function useEvaluationConfig(
         setRepetitions,
         setSelectedDatasets,
         setModels,
+        setUseRag,
+        setRagMode,
+        setEvaluateRag,
         addModel,
         removeModel,
         duplicateModel,
