@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as rag_router
+from app.api.evaluation_routes import router as evaluation_router
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -50,6 +51,7 @@ app.add_middleware(
 # Register routers
 # ---------------------------------------------------------------------------
 app.include_router(rag_router)
+app.include_router(evaluation_router)
 
 
 @app.get("/", tags=["Root"])

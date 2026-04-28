@@ -5,9 +5,13 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# System deps needed by some Python packages (e.g. PyMuPDF, lightrag)
+# System deps needed by Python packages:
+#   build-essential  — compiles C extensions (e.g. tiktoken, tokenizers)
+#   git              — some pip packages fetch git metadata at install time
+#   libgl1 / libglib — required by PyMuPDF / LightRAG
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    git \
     libgl1 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
@@ -25,7 +29,7 @@ WORKDIR /app
 # Copy installed packages from builder
 COPY --from=builder /install /usr/local
 
-# System runtime libs
+# System runtime libs (no build-essential needed here)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
