@@ -102,6 +102,27 @@ def parse_rag_response(raw_response: str) -> Dict:
         return result
 
     # -------------------------------
+    # Parse Reference Document List
+    # Format: [1] file_path_or_name
+    # This maps numeric reference_ids in chunks to actual source names.
+    # -------------------------------
+    ref_map: dict[str, str] = {}
+    ref_section = re.search(
+        r"Reference Document List[^\n]*\n+```\n(.*?)```",
+        raw_response,
+        re.DOTALL,
+    )
+    if ref_section:
+        for line in ref_section.group(1).splitlines():
+            m = re.match(r"\[(\d+)\]\s+(.+)", line.strip())
+            if m:
+                ref_id = m.group(1)
+                file_name = m.group(2).strip()
+                # Keep only the final path component (stem) without extension
+                file_name = re.sub(r"\.[^./\\]+$", "", file_name.replace("\\", "/").split("/")[-1])
+                ref_map[ref_id] = file_name
+
+    # -------------------------------
     # Split Sections (robust)
     # -------------------------------
     sections = re.split(
@@ -176,6 +197,10 @@ def parse_rag_response(raw_response: str) -> Dict:
     # -------------------------------
     # Document Processing
     # -------------------------------
+    if document_objects:
+        logger.info("parse_rag_response: first doc chunk keys=%s sample=%s",
+                    list(document_objects[0].keys()), document_objects[0])
+
     doc_id_counter = 1
 
     for obj in document_objects:
@@ -189,15 +214,27 @@ def parse_rag_response(raw_response: str) -> Dict:
         doc_id = f"doc_{doc_id_counter}"
         doc_id_counter += 1
 
+        raw_ref = next(
+            (
+                str(v).strip()
+                for v in [
+                    obj.get("reference_id"),
+                    obj.get("full_doc_id"),
+                    obj.get("file_path"),
+                    obj.get("file_name"),
+                    obj.get("doc_id"),
+                    obj.get("source_id"),
+                ]
+                if v is not None and str(v).strip()
+            ),
+            None,
+        )
+        # Resolve numeric reference_id to actual source name via the reference map
+        resolved_ref = ref_map.get(raw_ref, raw_ref) if raw_ref else None
+
         result["documents"].append({
             "id": doc_id,
-            "reference_id": (
-                obj.get("reference_id")
-                or obj.get("doc_id")
-                or obj.get("source_id")
-                or obj.get("file_name")
-                or None
-            ),
+            "reference_id": resolved_ref,
             "content": content,
             "preview": make_preview(content)
         })

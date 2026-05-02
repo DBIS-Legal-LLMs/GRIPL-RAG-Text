@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     embedding_api_key: str = ""        # Only for openai binding
     embedding_api_base: str = ""       # Only for openai binding
 
+    # --- Ragas Evaluation Overrides ---
+    # Override only the LLM used for metric scoring (leave blank to use LLM_MODEL).
+    ragas_llm_model: str = ""           # e.g. "openai/gpt-4o-mini"
+
     # --- Neo4j Settings ---
     neo4j_uri: str = "neo4j://localhost:7687"
     neo4j_username: str = "neo4j"

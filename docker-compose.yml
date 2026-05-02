@@ -42,6 +42,11 @@ services:
     image: ${RAG_IMAGE:-mertend/gripl-rag:latest}
     container_name: ${RAG_CONTAINER_NAME:-gripl-rag}
     restart: unless-stopped
+    env_file:
+      - ./.env.local
+    volumes:
+      - gripl-rag-working-dir:/app/rag_working_dir
+      - ./gripl/gripl-rag/data:/app/data:ro
     networks:
       - app
 
@@ -57,6 +62,7 @@ services:
 volumes:
   playwright-browsers:
   gripl-postgres-data:
+  gripl-rag-working-dir:
 
 networks:
   app:

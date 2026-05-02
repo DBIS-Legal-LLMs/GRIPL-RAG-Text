@@ -18,11 +18,10 @@ interface RagMetricsCardProps {
  * Renders nothing if no RAG metrics are available.
  */
 export default function RagMetricsCard({ title = "RAG Metrics (Ragas)", summary, testCase }: RagMetricsCardProps) {
-    const contextPrecision = summary?.contextPrecisionMean ?? testCase?.contextPrecision ?? null;
     const faithfulness = summary?.faithfulnessMean ?? testCase?.faithfulness ?? null;
     const answerRelevancy = summary?.answerRelevancyMean ?? testCase?.answerRelevancy ?? null;
 
-    const hasAny = contextPrecision !== null || faithfulness !== null || answerRelevancy !== null;
+    const hasAny = faithfulness !== null || answerRelevancy !== null;
     if (!hasAny) return null;
 
     const fmt = (v: number | null) => (v === null ? "n/a" : v.toFixed(3));
@@ -41,12 +40,7 @@ export default function RagMetricsCard({ title = "RAG Metrics (Ragas)", summary,
                 <CardTitle>{title}</CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center">
-                        <div className="text-3xl font-bold text-chart-metric-1">{fmt(contextPrecision)}</div>
-                        <div className="text-sm text-muted-foreground">Context Precision</div>
-                        <Progress value={pct(contextPrecision)} className="h-2 mt-2" />
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="text-center">
                         <div className="text-3xl font-bold text-chart-metric-2">{fmt(faithfulness)}</div>
                         <div className="text-sm text-muted-foreground">Faithfulness</div>

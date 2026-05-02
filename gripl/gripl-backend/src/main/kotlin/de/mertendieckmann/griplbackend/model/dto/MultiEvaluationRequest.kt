@@ -9,6 +9,9 @@ data class MultiEvaluationRequest(
     val seed: Int?,
     val datasets: List<Int>,
     val repetitions: Int = 1,
+    val useRag: Boolean = false,
+    val ragMode: String = "hybrid",
+    val evaluateRag: Boolean = true,
 )
 
 data class ModelRunConfig(
@@ -19,4 +22,3 @@ data class ModelRunConfig(
     override fun toString(): String =
         "EvaluationRequest(label=$label, llmProps=${llmProps?.copy(apiKey = llmProps.apiKey?.let { "\"****\"" })})"
 }
-

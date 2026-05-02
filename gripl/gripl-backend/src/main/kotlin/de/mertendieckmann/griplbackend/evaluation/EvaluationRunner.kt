@@ -1,10 +1,13 @@
 package de.mertendieckmann.griplbackend.evaluation
 
+import de.mertendieckmann.griplbackend.application.BpmnExtractor
 import de.mertendieckmann.griplbackend.evaluation.metrics.MetricsAccumulator
 import de.mertendieckmann.griplbackend.evaluation.service.Evaluator
+import de.mertendieckmann.griplbackend.evaluation.service.RagasEvaluationService
 import de.mertendieckmann.griplbackend.model.dto.*
 import de.mertendieckmann.griplbackend.model.evaluation.EvaluationMetrics
 import de.mertendieckmann.griplbackend.model.evaluation.EvaluationOutcome
+import de.mertendieckmann.griplbackend.model.evaluation.RagMetrics
 import de.mertendieckmann.griplbackend.repository.EvaluationDataRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -15,10 +18,12 @@ import java.util.concurrent.atomic.AtomicInteger
 @Component
 class EvaluationRunner(
     private val evaluationDataRepository: EvaluationDataRepository,
-    private val evaluator: Evaluator
+    private val evaluator: Evaluator,
+    private val ragasEvaluationService: RagasEvaluationService
 ) {
 
     private val log = KotlinLogging.logger {}
+    private val bpmnExtractor = BpmnExtractor()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun run(request: EvaluationRequest): Flow<EvaluationReport> {
@@ -28,7 +33,7 @@ class EvaluationRunner(
         val entriesFlow = evaluationDataRepository.getEvaluationDataByDatasetIdsOrAll(request.datasets)
             .sortedBy { it.id }.asFlow()
 
-        log.info { "Starting evaluation with endpoint=${request.evaluationEndpoint}; maxConcurrent=${request.maxConcurrent}" }
+        log.info { "Starting evaluation with endpoint=${request.evaluationEndpoint}; maxConcurrent=${request.maxConcurrent}; evaluateRag=${request.evaluateRag}" }
 
         return entriesFlow
             .flatMapMerge(concurrency = request.maxConcurrent.coerceAtLeast(1)) { entry ->
@@ -59,7 +64,7 @@ class EvaluationRunner(
     ): EvaluationOutcome = try {
         val expectedActivityIds = entry.expectedValues.map { it.value }
         val actualResult = evaluator.evaluate(entry.bpmnXml, evaluationRequest)
-        val actualActivityIds = actualResult.first.map { it.value }
+        val actualActivityIds = actualResult.expectedValues.map { it.value }
 
         val bpmnModel = parseBpmn(entry.bpmnXml)
 
@@ -71,13 +76,25 @@ class EvaluationRunner(
             falseNegativesCount = classification.falseNegativeIds.size
         )
 
+        if (evaluationRequest.evaluateRag && actualResult.analysisResponse.ragContext.isNullOrEmpty()) {
+            log.warn { "RAG context missing or empty -> proceeding with evaluation but metrics might be affected for ${entry.id}" }
+        }
+
+        val ragMetrics: RagMetrics? = if (evaluationRequest.evaluateRag) {
+            val bpmnElements = bpmnExtractor.extractBpmnElements(entry.bpmnXml)
+            ragasEvaluationService.scoreTestCase(actualResult.analysisResponse, bpmnElements)
+        } else {
+            null
+        }
+
         val metrics = EvaluationMetrics(
             truePositives = classification.truePositiveIds.size,
             falsePositives = classification.falsePositiveIds.size,
             falseNegatives = classification.falseNegativeIds.size,
             trueNegatives = trueNegativesCount,
             isSuccessful = actualActivityIds.toSet() == expectedActivityIds.toSet(),
-            amountOfRetries = actualResult.second
+            amountOfRetries = actualResult.amountOfRetries,
+            ragMetrics = ragMetrics
         )
 
         val testCaseReport = TestCaseReport(
@@ -96,8 +113,16 @@ class EvaluationRunner(
             expectedNamesWithIds = getNamesWithIds(bpmnModel, expectedActivityIds),
             actualNamesWithIds = getNamesWithIds(bpmnModel, actualActivityIds),
             isSuccessful = metrics.isSuccessful,
-            result = actualResult.first,
-            amountOfRetries = actualResult.second
+            result = actualResult.expectedValues,
+            amountOfRetries = actualResult.amountOfRetries,
+            ragMetrics = ragMetrics?.let {
+                TestCaseRagMetrics(
+                    faithfulness = it.faithfulness,
+                    answerRelevancy = it.answerRelevancy,
+                    sampleCount = it.sampleCount,
+                    failedCount = it.failedCount
+                )
+            }
         )
 
         EvaluationOutcome.Success(testCaseReport, metrics)

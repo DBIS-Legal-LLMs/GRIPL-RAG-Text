@@ -46,6 +46,9 @@ services:
       - traefik.http.middlewares.gripl-backend-strip-prefix.stripprefix.prefixes=/api
       - traefik.http.routers.gripl-backend.middlewares=gripl-backend-strip-prefix
       - traefik.http.services.gripl-backend.loadbalancer.server.port=${BACKEND_PORT:-8080}
+      - traefik.http.routers.gripl-backend-webjars.rule=Host(`localhost`) && PathPrefix(`/webjars`)
+      - traefik.http.routers.gripl-backend-webjars.entrypoints=web
+      - traefik.http.routers.gripl-backend-webjars.service=gripl-backend
     networks:
       - app
 

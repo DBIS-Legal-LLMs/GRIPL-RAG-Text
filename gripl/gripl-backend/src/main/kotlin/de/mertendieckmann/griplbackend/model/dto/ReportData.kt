@@ -65,10 +65,21 @@ data class TestCaseReport(
     val actualNamesWithIds: List<String>,
     val isSuccessful: Boolean,
     val result: List<ExpectedValue>,
-    val amountOfRetries: Int? = null
+    val amountOfRetries: Int? = null,
+    val ragMetrics: TestCaseRagMetrics? = null
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
+        val ragBlock = ragMetrics?.let {
+            """
+            |
+            |### RAG Metrics (Ragas)
+            |- **Faithfulness:** ${it.faithfulness?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |- **Answer Relevancy:** ${it.answerRelevancy?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |- **Samples:** ${it.sampleCount} (failed: ${it.failedCount})
+            """.trimMargin()
+        } ?: ""
+
         return """
             |## Test Case $testCaseId${if (testCaseName != null) " - $testCaseName" else ""}
             |<img src="$imageSrc" alt="Test Case BPMN XML" />
@@ -85,6 +96,7 @@ data class TestCaseReport(
             |- **False Negatives:** ${if (falseNegativeIds.isEmpty()) "None" else falseNegativeIds.joinToString(", ") { id -> expectedNamesWithIds.find { it.contains(id) } ?: id }}
             |
             |- **Amount of Retries:** ${amountOfRetries ?: "N/A"}
+            |$ragBlock
             |
             |<details>
             |<summary><h3>Reasoning of the LLM</h3></summary>
@@ -95,6 +107,22 @@ data class TestCaseReport(
         """.trimMargin()
     }
 }
+
+data class TestCaseRagMetrics(
+    val faithfulness: Double? = null,
+    val answerRelevancy: Double? = null,
+    val sampleCount: Int = 0,
+    val failedCount: Int = 0
+)
+
+
+data class RagSummaryMetrics(
+    val faithfulnessMean: Double? = null,
+    val answerRelevancyMean: Double? = null,
+    val evaluatedTestCases: Int = 0,
+    val totalSamples: Int = 0,
+    val failedSamples: Int = 0
+)
 
 data class EvaluationReportSummary(
     val total: Int,
@@ -109,10 +137,21 @@ data class EvaluationReportSummary(
     val totalTruePositives: Int,
     val totalFalsePositives: Int,
     val totalFalseNegatives: Int,
-    val totalTrueNegatives: Int
+    val totalTrueNegatives: Int,
+    val ragMetrics: RagSummaryMetrics? = null
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
+        val ragBlock = ragMetrics?.let {
+            """
+            |
+            |### RAG Metrics (Ragas) — averaged across $evaluatedTestCasesText
+            |Faithfulness: ${it.faithfulnessMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |Answer Relevancy: ${it.answerRelevancyMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |Total Samples Scored: ${it.totalSamples} (failed: ${it.failedSamples})
+            """.trimMargin()
+        } ?: ""
+
         return """
             |## Summary
             |Total: $total
@@ -132,8 +171,12 @@ data class EvaluationReportSummary(
             |False Positives: $totalFalsePositives
             |False Negatives: $totalFalseNegatives
             |True Negatives: $totalTrueNegatives
+            |$ragBlock
         """.trimMargin()
     }
+
+    private val evaluatedTestCasesText: String
+        get() = ragMetrics?.evaluatedTestCases?.let { "$it test case(s)" } ?: "0 test cases"
 }
 
 data class EvaluationReportStepInfo(

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
+import math
 import os
+import threading
 from dataclasses import dataclass
 from typing import Optional
 
@@ -11,7 +14,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-SUPPORTED_METRICS = ("context_precision", "faithfulness", "answer_relevancy")
+SUPPORTED_METRICS = ("faithfulness", "answer_relevancy")
 
 
 @dataclass
@@ -27,6 +30,9 @@ _bundle_lock = asyncio.Lock()
 
 def _build_langchain_llm():
     """Build a LangChain chat model based on the configured binding."""
+    # Ragas can override the LLM model without affecting the LightRAG engine.
+    llm_model = settings.ragas_llm_model or settings.llm_model
+
     if settings.llm_binding == "openai":
         os.environ["OPENAI_API_KEY"] = settings.llm_api_key
         if settings.llm_api_base:
@@ -39,7 +45,7 @@ def _build_langchain_llm():
                 "Ragas evaluator: OPENAI_API_KEY / llm_api_key is required "
                 "when llm_binding='openai'."
             )
-        kwargs = {"model": settings.llm_model, "api_key": api_key, "temperature": 0.0}
+        kwargs = {"model": llm_model, "api_key": api_key, "temperature": 0.0}
         if settings.llm_api_base:
             kwargs["base_url"] = settings.llm_api_base
         return ChatOpenAI(**kwargs)
@@ -53,7 +59,7 @@ def _build_langchain_llm():
                 "Ragas evaluator: GEMINI_API_KEY is required when llm_binding='gemini'."
             )
         return ChatGoogleGenerativeAI(
-            model=settings.llm_model,
+            model=llm_model,
             google_api_key=api_key,
             temperature=0.0,
         )
@@ -64,21 +70,66 @@ def _build_langchain_llm():
     )
 
 
+class _OpenAIFloatEmbeddings:
+    """LangChain-compatible embeddings wrapper that forces encoding_format='float'.
+
+    LangChain's built-in OpenAIEmbeddings sends encoding_format='base64' by
+    default, which some providers (e.g. OpenRouter) don't support for all
+    models — they return response.data = None. This wrapper uses the same
+    direct AsyncOpenAI approach that the LightRAG engine already uses.
+    """
+
+    def __init__(self, model: str, api_key: str, base_url: str | None = None):
+        self._model = model
+        self._api_key = api_key
+        self._base_url = base_url
+
+    async def _embed(self, texts: list[str]) -> list[list[float]]:
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=self._api_key, base_url=self._base_url or None)
+        try:
+            response = await client.embeddings.create(
+                model=self._model,
+                input=texts,
+                encoding_format="float",
+            )
+        finally:
+            await client.close()
+        return [dp.embedding for dp in response.data]
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self._embed(texts))
+
+        def run_in_new_loop():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(self._embed(texts))
+            finally:
+                loop.close()
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            return executor.submit(run_in_new_loop).result()
+
+    def embed_query(self, text: str) -> list[float]:
+        return self.embed_documents([text])[0]
+
+
 def _build_langchain_embeddings():
-    """Build a LangChain embedding model based on the configured binding."""
+    """Build a LangChain-compatible embedding model based on the configured binding."""
     if settings.embedding_binding == "openai":
         api_key = settings.embedding_api_key or os.environ.get("OPENAI_API_KEY", "")
         if not api_key:
             raise RuntimeError("Ragas evaluator: OpenAI embedding api_key is required.")
-
-        from langchain_openai import OpenAIEmbeddings
-
-        kwargs = {"model": settings.embedding_model, "api_key": api_key}
-        if settings.embedding_api_base:
-            kwargs["base_url"] = settings.embedding_api_base
-            os.environ["OPENAI_API_BASE"] = settings.embedding_api_base
-        
-        return OpenAIEmbeddings(**kwargs)
+        return _OpenAIFloatEmbeddings(
+            model=settings.embedding_model,
+            api_key=api_key,
+            base_url=settings.embedding_api_base or None,
+        )
 
     if settings.embedding_binding == "gemini":
         from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -90,7 +141,6 @@ def _build_langchain_embeddings():
         )
 
     if settings.embedding_binding == "local":
-        # answer_relevancy needs an embedder; fall back to a HF wrapper if used.
         from langchain_community.embeddings import HuggingFaceEmbeddings
 
         return HuggingFaceEmbeddings(model_name=settings.embedding_model)
@@ -115,7 +165,6 @@ async def _get_bundle() -> _EvaluatorBundle:
         from ragas.llms import LangchainLLMWrapper
         from ragas.embeddings import LangchainEmbeddingsWrapper
         from ragas.metrics import (
-            LLMContextPrecisionWithoutReference,
             Faithfulness,
             ResponseRelevancy,
         )
@@ -127,7 +176,6 @@ async def _get_bundle() -> _EvaluatorBundle:
         evaluator_emb = LangchainEmbeddingsWrapper(lc_emb)
 
         metrics = {
-            "context_precision": LLMContextPrecisionWithoutReference(llm=evaluator_llm),
             "faithfulness": Faithfulness(llm=evaluator_llm),
             "answer_relevancy": ResponseRelevancy(
                 llm=evaluator_llm, embeddings=evaluator_emb
@@ -152,13 +200,26 @@ def _build_sample(query: str, contexts: list[str], response: str):
     )
 
 
+_METRIC_TIMEOUT_SECONDS = 120.0
+
+
 async def _score_one(metric, sample) -> Optional[float]:
-    """Score a single sample with one metric, returning None on failure."""
+    """Score a single sample with one metric, returning None on failure or timeout."""
     try:
-        score = await metric.single_turn_ascore(sample)
-        if score is None:
+        score = await asyncio.wait_for(
+            metric.single_turn_ascore(sample),
+            timeout=_METRIC_TIMEOUT_SECONDS,
+        )
+        if score is None or math.isnan(score):
             return None
         return float(score)
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Ragas metric %s timed out after %.0fs — skipping",
+            type(metric).__name__,
+            _METRIC_TIMEOUT_SECONDS,
+        )
+        return None
     except Exception as exc:  # noqa: BLE001
         logger.warning("Ragas metric %s failed: %s", type(metric).__name__, exc)
         return None

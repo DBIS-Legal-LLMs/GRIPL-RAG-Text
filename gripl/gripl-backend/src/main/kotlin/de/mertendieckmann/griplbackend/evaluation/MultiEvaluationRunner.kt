@@ -41,7 +41,10 @@ class MultiEvaluationRunner(
                     evaluationEndpoint = effectiveEndpoint,
                     llmProps = model.llmProps?.copy(seed = runSeed),
                     maxConcurrent = request.maxConcurrent,
-                    datasets = request.datasets
+                    datasets = request.datasets,
+                    useRag = request.useRag,
+                    ragMode = request.ragMode,
+                    evaluateRag = request.evaluateRag
                 )
 
                 singleRunner.run(singleRequest)

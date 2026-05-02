@@ -7,7 +7,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from dotenv import load_dotenv
-load_dotenv(project_root / ".env")
+repo_root = project_root.parent.parent
+load_dotenv(repo_root / ".env.local")
 
 
 async def main():

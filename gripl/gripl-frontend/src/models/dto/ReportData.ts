@@ -13,7 +13,6 @@ export interface EvaluationMetadataReport {
 }
 
 export interface TestCaseRagMetrics {
-    contextPrecision: number | null;
     faithfulness: number | null;
     answerRelevancy: number | null;
     sampleCount: number;
@@ -21,7 +20,6 @@ export interface TestCaseRagMetrics {
 }
 
 export interface RagSummaryMetrics {
-    contextPrecisionMean: number | null;
     faithfulnessMean: number | null;
     answerRelevancyMean: number | null;
     evaluatedTestCases: number;

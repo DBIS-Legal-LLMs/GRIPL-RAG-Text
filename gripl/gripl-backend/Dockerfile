@@ -8,8 +8,6 @@ RUN mvn dependency:go-offline dependency:resolve-plugins -q
 COPY src ./src
 RUN mvn package -DskipTests
 
-RUN mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install-deps"
-
 FROM mcr.microsoft.com/playwright:latest AS runtime
 USER root
 RUN apt-get update && apt-get install -y openjdk-17-jre-headless \
