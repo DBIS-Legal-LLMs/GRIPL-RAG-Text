@@ -1,128 +1,164 @@
-import {RagElementContext} from "@/models/dto/AnalysisDto";
-import {Badge} from "@/components/ui/badge";
-import {BookOpen, GitBranch, Landmark} from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import dynamic from "next/dynamic";
+import { RagElementContext } from "@/models/dto/AnalysisDto";
+import { Badge } from "@/components/ui/badge";
+import { BookOpen, FileText } from "lucide-react";
+
+const KnowledgeGraph = dynamic(() => import("@/components/sandbox/knowledge-graph"), { ssr: false });
+const PdfViewerModal = dynamic(() => import("@/components/sandbox/pdf-viewer-modal"), { ssr: false });
 
 interface RagContextCardProps {
     ragContext: Record<string, RagElementContext>;
     selectedElementId?: string | null;
 }
 
+interface ViewerState {
+    documentName: string;
+    exactText: string;
+}
+
 export default function RagContextCard({ ragContext, selectedElementId }: RagContextCardProps) {
     const entries = Object.entries(ragContext);
+    const [viewerState, setViewerState] = useState<ViewerState | null>(null);
+
+    // Active tab: "all" or an elementId
+    const [activeTab, setActiveTab] = useState<string>("all");
 
     if (entries.length === 0) {
-        return <p className="text-sm text-muted-foreground p-4">No RAG context was retrieved for any activity.</p>
+        return <p className="text-sm text-muted-foreground p-4">No RAG context was retrieved for any activity.</p>;
     }
 
-    return (
-        <div className="max-h-[400px] overflow-y-auto space-y-4 p-1">
-            {entries.map(([elementId, ctx]) => {
-                const isSelected = elementId === selectedElementId;
-                const hasContent = ctx.entities.length > 0 || ctx.relationships.length > 0 || ctx.documents.length > 0;
+    // Determine which entries to show in the graph
+    const visibleEntries =
+        activeTab === "all" ? entries : entries.filter(([id]) => id === activeTab);
 
-                return (
-                    <div
-                        key={elementId}
-                        className={`rounded-lg border p-3 space-y-2 transition-colors ${
-                            isSelected ? "border-primary bg-primary/5" : "border-border"
+    // Merge entities and relationships for visible entries (deduplicated)
+    const mergedEntities = visibleEntries.flatMap(([, ctx]) => ctx.entities);
+    const mergedRelationships = visibleEntries.flatMap(([, ctx]) => ctx.relationships);
+    const mergedDocuments = visibleEntries.flatMap(([, ctx]) => ctx.documents);
+
+    return (
+        <>
+            <div className="flex flex-col gap-3 h-full">
+                {/* Activity tabs */}
+                <div className="flex flex-wrap gap-1.5 px-1 pt-1">
+                    <button
+                        onClick={() => setActiveTab("all")}
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                            activeTab === "all"
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
                         }`}
                     >
-                        {/* Activity header */}
-                        <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">
+                        All activities
+                    </button>
+                    {entries.map(([elementId, ctx]) => {
+                        const isActive = activeTab === elementId;
+                        const isSelected = elementId === selectedElementId;
+                        const total = ctx.entities.length + ctx.relationships.length;
+                        return (
+                            <button
+                                key={elementId}
+                                onClick={() => setActiveTab(elementId)}
+                                className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                                    isActive
+                                        ? "bg-primary text-primary-foreground border-primary"
+                                        : isSelected
+                                        ? "border-primary/60 text-primary hover:border-primary"
+                                        : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                                }`}
+                            >
                                 {ctx.activityName || elementId}
-                            </span>
-                            <Badge variant="secondary" className="text-xs">
-                                {elementId}
-                            </Badge>
-                        </div>
-
-                        {!hasContent && (
-                            <p className="text-xs text-muted-foreground italic">
-                                No context retrieved for this activity.
-                            </p>
-                        )}
-
-                        {/* Entities */}
-                        {ctx.entities.length > 0 && (
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-                                    <Landmark className="h-3 w-3" />
-                                    Entities
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                    {ctx.entities.map((entity, i) => (
-                                        <Badge key={i} variant="outline" className="text-xs font-normal">
-                                            <span className="text-muted-foreground mr-1">[{entity.type}]</span>
-                                            {entity.label}
-                                        </Badge>
-                                    ))}
-                                </div>
-                                {/* Show descriptions for entities that have them */}
-                                {ctx.entities.filter(e => e.description).length > 0 && (
-                                    <ul className="text-xs text-muted-foreground list-disc list-inside pl-1 space-y-0.5">
-                                        {ctx.entities
-                                            .filter(e => e.description)
-                                            .slice(0, 5)
-                                            .map((e, i) => (
-                                                <li key={i}>
-                                                    <span className="font-medium">{e.label}:</span>{" "}
-                                                    {e.description}
-                                                </li>
-                                            ))}
-                                    </ul>
+                                {total > 0 && (
+                                    <span className={`ml-1.5 ${isActive ? "opacity-80" : "opacity-50"}`}>
+                                        {total}
+                                    </span>
                                 )}
-                            </div>
-                        )}
+                            </button>
+                        );
+                    })}
+                </div>
 
-                        {/* Relationships */}
-                        {ctx.relationships.length > 0 && (
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-                                    <GitBranch className="h-3 w-3" />
-                                    Relationships
-                                </div>
-                                <ul className="text-xs space-y-0.5 pl-1">
-                                    {ctx.relationships.map((rel, i) => (
-                                        <li key={i} className="flex items-center gap-1">
-                                            <span className="font-medium">{rel.source}</span>
-                                            <span className="text-muted-foreground">→</span>
-                                            <span className="font-medium">{rel.target}</span>
-                                            <span className="text-muted-foreground">({rel.label})</span>
-                                        </li>
-                                    ))}
-                                </ul>
+                {/* Main content: graph + documents */}
+                <div className="flex gap-3" style={{ height: "420px" }}>
+                    {/* Graph panel */}
+                    <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/20 overflow-hidden relative" style={{ height: "420px" }}>
+                        {mergedEntities.length === 0 ? (
+                            <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                                No entities retrieved for this selection.
                             </div>
+                        ) : (
+                            <KnowledgeGraph
+                                entities={mergedEntities}
+                                relationships={mergedRelationships}
+                            />
                         )}
-
-                        {/* Documents */}
-                        {ctx.documents.length > 0 && (
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-                                    <BookOpen className="h-3 w-3" />
-                                    Legal Excerpts
-                                </div>
-                                <div className="space-y-2">
-                                    {ctx.documents.map((doc, i) => (
-                                        <div key={i} className="space-y-0.5">
-                                            <blockquote
-                                                className="text-xs text-muted-foreground border-l-2 border-primary/30 pl-2 italic"
-                                            >
-                                                {doc.preview}
-                                            </blockquote>
-                                            {doc.sourceDocument && (
-                                                <p className="text-xs text-primary/70 pl-2 font-medium">
-                                                    📄 {doc.sourceDocument.replace(/[_-]/g, " ")}
-                                                </p>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
+                        {/* Stats overlay */}
+                        {mergedEntities.length > 0 && (
+                            <div className="absolute top-2 left-2 flex gap-1.5">
+                                <Badge variant="secondary" className="text-xs">
+                                    {mergedEntities.length} entities
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                    {mergedRelationships.length} relationships
+                                </Badge>
                             </div>
                         )}
                     </div>
-                );
-            })}
-        </div>
+
+                    {/* Documents panel */}
+                    <div className="w-56 flex-shrink-0 flex flex-col gap-1.5 overflow-y-auto" style={{ maxHeight: "420px" }}>
+                        <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground px-0.5">
+                            <BookOpen className="h-3 w-3" />
+                            Legal Excerpts
+                            {mergedDocuments.length > 0 && (
+                                <span className="ml-auto opacity-60">{mergedDocuments.length}</span>
+                            )}
+                        </div>
+                        {mergedDocuments.length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic px-0.5">No documents retrieved.</p>
+                        ) : (
+                            mergedDocuments.map((doc, i) => (
+                                <div
+                                    key={i}
+                                    className="rounded-md border border-border bg-background p-2 space-y-1"
+                                >
+                                    <blockquote className="text-xs text-muted-foreground border-l-2 border-primary/30 pl-2 italic line-clamp-4">
+                                        {doc.preview}
+                                    </blockquote>
+                                    {doc.sourceDocument && (
+                                        <button
+                                            className="text-xs text-primary/70 font-medium underline-offset-2 hover:underline cursor-pointer text-left flex items-center gap-1"
+                                            onClick={() =>
+                                                setViewerState({
+                                                    documentName: doc.sourceDocument!,
+                                                    exactText: doc.content,
+                                                })
+                                            }
+                                        >
+                                            <FileText className="h-3 w-3 flex-shrink-0" />
+                                            <span className="truncate">
+                                                {doc.sourceDocument.replace(/[_-]/g, " ")}
+                                            </span>
+                                        </button>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {viewerState && (
+                <PdfViewerModal
+                    open={true}
+                    onClose={() => setViewerState(null)}
+                    documentName={viewerState.documentName}
+                    exactText={viewerState.exactText}
+                />
+            )}
+        </>
     );
 }

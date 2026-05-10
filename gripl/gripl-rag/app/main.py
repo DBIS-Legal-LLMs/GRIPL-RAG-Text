@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as rag_router
 from app.api.evaluation_routes import router as evaluation_router
+from app.api.pdf_routes import router as pdf_router
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -52,6 +53,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 app.include_router(rag_router)
 app.include_router(evaluation_router)
+app.include_router(pdf_router)
 
 
 @app.get("/", tags=["Root"])

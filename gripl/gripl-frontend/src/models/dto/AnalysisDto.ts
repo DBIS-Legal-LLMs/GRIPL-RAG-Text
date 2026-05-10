@@ -43,3 +43,17 @@ export interface RagDocument {
     preview: string;
     sourceDocument?: string | null;
 }
+
+export interface PdfHighlightRect {
+    x0: number;
+    y0: number;
+    x1: number;
+    y1: number;
+}
+
+export interface PdfLocateResponse {
+    page: number | null;
+    rects: PdfHighlightRect[];
+    page_width: number;
+    page_height: number;
+}

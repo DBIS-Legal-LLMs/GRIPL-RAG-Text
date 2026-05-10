@@ -363,7 +363,7 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
           ).map(([position, positionCards]) => (
             <div
                 key={`bpmn-editor-position-${position}`}
-                className={`absolute z-10 gap-4
+                className={`absolute z-50 gap-4
                   ${position === "bottom-left" ? "left-4 bottom-4 flex-flex-col items-start" : ""}
                   ${position === "bottom-right" ? "right-4 bottom-14 flex flex-col items-end" : ""}
                   ${position === "top-right" ? "right-4 top-4 flex flex-col items-end" : ""}

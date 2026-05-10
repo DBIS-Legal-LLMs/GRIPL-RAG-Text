@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic";
 import BpmnEditor from "@/components/bpmn-editor";
 import {useState} from "react";
 import {BpmnToolCard} from "@/models/BpmnToolCard";
@@ -11,12 +12,20 @@ import RagContextCard from "@/components/sandbox/rag-context-card";
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Card, CardContent} from "@/components/ui/card";
-import {Brain, BookOpen} from "lucide-react";
+import {Brain, BookOpen, Paperclip, FileText} from "lucide-react";
+
+const PdfViewerModal = dynamic(() => import("@/components/sandbox/pdf-viewer-modal"), { ssr: false });
+
+interface PdfViewerState {
+  documentName: string;
+  exactText: string;
+}
 
 export default function Home() {
   const [diagram, setDiagram] = useState<string>(emptyDiagram as string)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
+  const [pdfViewer, setPdfViewer] = useState<PdfViewerState | null>(null)
 
   function handleCreateNewDiagram() {
     setAnalysisResult(null)
@@ -66,7 +75,7 @@ export default function Home() {
                                           {hasRefs && (
                                               <details className="mt-2">
                                                   <summary className="cursor-pointer text-xs font-semibold text-primary/80 hover:text-primary select-none w-fit">
-                                                      📎 References ({element.references!.length})
+                                                      <Paperclip className="inline h-3 w-3 mr-1" />References ({element.references!.length})
                                                   </summary>
                                                   <div className="mt-1.5 space-y-2 pl-1">
                                                       {element.references!.map((ref, ri) => (
@@ -75,9 +84,15 @@ export default function Home() {
                                                                   &ldquo;{ref.exactText}&rdquo;
                                                               </blockquote>
                                                               {ref.sourceDocument && (
-                                                                  <p className="text-xs text-primary/70 font-medium">
-                                                                      📄 {ref.sourceDocument.replace(/[_-]/g, " ")}
-                                                                  </p>
+                                                                  <button
+                                                                      className="text-xs text-primary/70 font-medium underline-offset-2 hover:underline cursor-pointer text-left"
+                                                                      onClick={() => setPdfViewer({
+                                                                          documentName: ref.sourceDocument!,
+                                                                          exactText: ref.exactText,
+                                                                      })}
+                                                                  >
+                                                                      <FileText className="inline h-3 w-3 mr-1" />{ref.sourceDocument.replace(/[_-]/g, " ")}
+                                                                  </button>
                                                               )}
                                                           </div>
                                                       ))}
@@ -119,16 +134,27 @@ export default function Home() {
     }] : [])
   ]
 
-  return <main className="flex flex-col justify-center items-center h-full w-full">
-    <div className="w-full h-full">
-      <BpmnEditor
-          bpmnXml={diagram}
-          highlightedActivityIds={analysisResult?.criticalElements?.map(e => e.id) || []}
-          onNew={handleCreateNewDiagram}
-          onDiagramChanged={setDiagram}
-          cards={editorToolCards}
-          onEvent={onEvent}
-      />
-    </div>
-  </main>
+  return (
+      <main className="flex flex-col justify-center items-center h-full w-full">
+        <div className="w-full h-full">
+          <BpmnEditor
+              bpmnXml={diagram}
+              highlightedActivityIds={analysisResult?.criticalElements?.map(e => e.id) || []}
+              onNew={handleCreateNewDiagram}
+              onDiagramChanged={setDiagram}
+              cards={editorToolCards}
+              onEvent={onEvent}
+          />
+        </div>
+
+        {pdfViewer && (
+            <PdfViewerModal
+                open={true}
+                onClose={() => setPdfViewer(null)}
+                documentName={pdfViewer.documentName}
+                exactText={pdfViewer.exactText}
+            />
+        )}
+      </main>
+  )
 }

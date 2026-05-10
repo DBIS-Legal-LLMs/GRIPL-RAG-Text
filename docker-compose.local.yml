@@ -69,6 +69,7 @@ services:
       - traefik.http.services.gripl-rag.loadbalancer.server.port=${RAG_PORT:-8081}
     volumes:
       - ./gripl/gripl-rag/rag_working_dir:/app/rag_working_dir
+      - ./gripl/gripl-rag/data:/app/data
     networks:
       - app
 
