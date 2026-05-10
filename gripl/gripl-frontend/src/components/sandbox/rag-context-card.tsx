@@ -4,7 +4,8 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { RagElementContext } from "@/models/dto/AnalysisDto";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, FileText } from "lucide-react";
+import { BookOpen, FileText, ChevronDown, ChevronRight, Network } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const KnowledgeGraph = dynamic(() => import("@/components/sandbox/knowledge-graph"), { ssr: false });
 const PdfViewerModal = dynamic(() => import("@/components/sandbox/pdf-viewer-modal"), { ssr: false });
@@ -22,6 +23,7 @@ interface ViewerState {
 export default function RagContextCard({ ragContext, selectedElementId }: RagContextCardProps) {
     const entries = Object.entries(ragContext);
     const [viewerState, setViewerState] = useState<ViewerState | null>(null);
+    const [isOpen, setIsOpen] = useState(true);
 
     // Active tab: "all" or an elementId
     const [activeTab, setActiveTab] = useState<string>("all");
@@ -41,7 +43,20 @@ export default function RagContextCard({ ragContext, selectedElementId }: RagCon
 
     return (
         <>
-            <div className="flex flex-col gap-3 h-full">
+            <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+            <CollapsibleTrigger className="w-full flex items-center justify-between px-1 py-1.5 rounded-md hover:bg-muted/50 transition-colors">
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                    <Network className="h-4 w-4" />
+                    Knowledge Retrieved
+                </span>
+                {isOpen ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                )}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+            <div className="flex flex-col gap-3 max-h-[520px] overflow-y-auto">
                 {/* Activity tabs */}
                 <div className="flex flex-wrap gap-1.5 px-1 pt-1">
                     <button
@@ -134,7 +149,7 @@ export default function RagContextCard({ ragContext, selectedElementId }: RagCon
                                             onClick={() =>
                                                 setViewerState({
                                                     documentName: doc.sourceDocument!,
-                                                    exactText: doc.content,
+                                                    exactText: doc.preview,
                                                 })
                                             }
                                         >
@@ -150,6 +165,8 @@ export default function RagContextCard({ ragContext, selectedElementId }: RagCon
                     </div>
                 </div>
             </div>
+            </CollapsibleContent>
+            </Collapsible>
 
             {viewerState && (
                 <PdfViewerModal

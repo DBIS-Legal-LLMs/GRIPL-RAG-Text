@@ -153,7 +153,7 @@ class PromptBpmnAnalyzer(
 
                 @Suppress("UNCHECKED_CAST")
                 (ctx["documents"] as? List<Map<String, Any>> ?: emptyList()).forEach eachDoc@{ d ->
-                    val docId = (d["reference_id"] as? String) ?: (d["preview"] as? String) ?: return@eachDoc
+                    val docId = (d["source_document"] as? String) ?: (d["preview"] as? String) ?: return@eachDoc
                     if (seenDocIds.add(docId)) allDocs += d
                 }
             } catch (e: Exception) {
@@ -194,7 +194,7 @@ class PromptBpmnAnalyzer(
             appendLine("Supporting Legal Excerpts:")
             allDocs.take(5).forEach { d ->
                 val preview = d["preview"] ?: d["content"] ?: ""
-                val sourceDoc = d["reference_id"] as? String
+                val sourceDoc = d["source_document"] as? String
                 if (sourceDoc != null) {
                     appendLine("  [Source: $sourceDoc] \"$preview\"")
                 } else {
@@ -255,7 +255,7 @@ class PromptBpmnAnalyzer(
                     RagDocument(
                         content = (d["content"] as? String) ?: "",
                         preview = (d["preview"] as? String) ?: (d["content"] as? String) ?: "",
-                        sourceDocument = (d["reference_id"] as? String)
+                        sourceDocument = (d["source_document"] as? String)
                     )
                 }
 

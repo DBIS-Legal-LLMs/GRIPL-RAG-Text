@@ -234,7 +234,7 @@ def parse_rag_response(raw_response: str) -> Dict:
 
         result["documents"].append({
             "id": doc_id,
-            "reference_id": resolved_ref,
+            "source_document": resolved_ref,
             "content": content,
             "preview": make_preview(content)
         })

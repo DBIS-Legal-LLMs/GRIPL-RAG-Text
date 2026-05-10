@@ -47,7 +47,7 @@ class RagRelationship(BaseModel):
 
 class RagDocument(BaseModel):
     id: str
-    reference_id: str | None
+    source_document: str | None
     content: str
     preview: str
 

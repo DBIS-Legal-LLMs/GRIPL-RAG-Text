@@ -11,8 +11,9 @@ import AnalysisResultCard from "@/components/sandbox/analysis-result-card";
 import RagContextCard from "@/components/sandbox/rag-context-card";
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
-import {Card, CardContent} from "@/components/ui/card";
-import {Brain, BookOpen, Paperclip, FileText} from "lucide-react";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
+import {Brain, BookOpen, Paperclip, FileText, ChevronDown, ChevronRight} from "lucide-react";
 
 const PdfViewerModal = dynamic(() => import("@/components/sandbox/pdf-viewer-modal"), { ssr: false });
 
@@ -26,6 +27,7 @@ export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const [pdfViewer, setPdfViewer] = useState<PdfViewerState | null>(null)
+  const [isPanelOpen, setIsPanelOpen] = useState<boolean>(true)
 
   function handleCreateNewDiagram() {
     setAnalysisResult(null)
@@ -41,7 +43,22 @@ export default function Home() {
 
   const bottomPanel = analysisResult ? (
       hasRagContext ? (
+          <Collapsible open={isPanelOpen} onOpenChange={setIsPanelOpen}>
           <Card className="container">
+              <CollapsibleTrigger className="w-full">
+                  <CardHeader className="w-full flex flex-row items-center justify-between hover:bg-muted/50 py-2">
+                      <CardTitle className="flex items-center gap-2 mr-4 text-sm">
+                          <Brain className="h-4 w-4" />
+                          Analysis Results
+                      </CardTitle>
+                      {isPanelOpen ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      )}
+                  </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
               <Tabs defaultValue="reasoning">
                   <div className="px-4 pt-3">
                       <TabsList>
@@ -55,7 +72,7 @@ export default function Home() {
                           </TabsTrigger>
                       </TabsList>
                   </div>
-                  <CardContent className="pt-2">
+                  <CardContent className="pt-2 max-h-[400px] overflow-y-auto">
                       <TabsContent value="reasoning">
                           <table className="w-full">
                               <thead>
@@ -113,7 +130,9 @@ export default function Home() {
                       </TabsContent>
                   </CardContent>
               </Tabs>
+              </CollapsibleContent>
           </Card>
+          </Collapsible>
       ) : (
           <AnalysisResultCard analysisResult={analysisResult} selectedElementId={selectedElementId} />
       )
