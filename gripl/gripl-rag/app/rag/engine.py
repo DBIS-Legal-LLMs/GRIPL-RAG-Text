@@ -191,6 +191,21 @@ def _get_embedding_func():
         )
 
 
+def _get_rerank_func():
+    if not settings.rerank_api_key:
+        return None
+
+    from functools import partial
+    from lightrag.rerank import cohere_rerank
+
+    return partial(
+        cohere_rerank,
+        api_key=settings.rerank_api_key,
+        model=settings.rerank_model,
+        base_url=settings.rerank_api_base,
+    )
+
+
 async def create_rag_instance() -> LightRAG:
     """
     RETURNS:
@@ -205,12 +220,14 @@ async def create_rag_instance() -> LightRAG:
 
     llm_func = _get_llm_func()
     embedding_func = _get_embedding_func()
+    rerank_func = _get_rerank_func()
 
     rag = LightRAG(
         working_dir=str(working_dir),
         llm_model_func=llm_func,
         llm_model_name=settings.llm_model,
         embedding_func=embedding_func,
+        rerank_model_func=rerank_func,
         graph_storage="Neo4JStorage",
         vector_storage="NanoVectorDBStorage",
         kv_storage="JsonKVStorage",

@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     embedding_api_key: str = ""        # Only for openai binding
     embedding_api_base: str = ""       # Only for openai binding
 
+    # --- Rerank Settings ---
+    rerank_model: str = "cohere/rerank-4-pro"
+    rerank_api_key: str = ""
+    rerank_api_base: str = "https://openrouter.ai/api/v1/rerank"
+    rerank_top_n: int = 10
+
     # --- Ragas Evaluation Overrides ---
     # Override only the LLM used for metric scoring (leave blank to use LLM_MODEL).
     ragas_llm_model: str = ""           # e.g. "openai/gpt-4o-mini"
