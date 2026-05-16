@@ -8,6 +8,7 @@ data class MultiEvaluationRequest(
     val models: List<ModelRunConfig>,
     val seed: Int?,
     val datasets: List<Int>,
+    val evaluationDataIds: List<Int> = emptyList(),
     val repetitions: Int = 1,
     val useRag: Boolean = false,
     val ragMode: String = "hybrid",

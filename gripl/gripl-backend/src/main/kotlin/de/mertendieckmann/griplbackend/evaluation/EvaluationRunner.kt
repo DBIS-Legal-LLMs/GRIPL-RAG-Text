@@ -30,8 +30,11 @@ class EvaluationRunner(
         val metricsAccumulator = MetricsAccumulator()
         val startedCounter = AtomicInteger(0)
 
-        val entriesFlow = evaluationDataRepository.getEvaluationDataByDatasetIdsOrAll(request.datasets)
-            .sortedBy { it.id }.asFlow()
+        val entriesFlow = (if (request.evaluationDataIds.isNotEmpty()) {
+            evaluationDataRepository.getEvaluationDataByIds(request.evaluationDataIds)
+        } else {
+            evaluationDataRepository.getEvaluationDataByDatasetIdsOrAll(request.datasets)
+        }).sortedBy { it.id }.asFlow()
 
         log.info { "Starting evaluation with endpoint=${request.evaluationEndpoint}; maxConcurrent=${request.maxConcurrent}; evaluateRag=${request.evaluateRag}" }
 

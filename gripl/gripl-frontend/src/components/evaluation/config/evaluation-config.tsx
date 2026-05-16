@@ -91,7 +91,9 @@ export default function EvaluationConfig({ className, children, datasets, onMult
                     <EvaluationConfigDatasetSettings
                         datasets={datasets}
                         selectedDatasets={config.selectedDatasets}
-                        onChange={config.setSelectedDatasets}
+                        selectedTestCaseIds={config.selectedTestCaseIds}
+                        onDatasetsChange={config.setSelectedDatasets}
+                        onTestCasesChange={config.setSelectedTestCaseIds}
                     />
                 </div>
 
