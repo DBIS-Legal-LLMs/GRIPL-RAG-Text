@@ -42,8 +42,10 @@ class PromptBpmnAnalyzer(
             // RAG-augmented path
             val ragContextMap = fetchRagContext(bpmnElements, ragMode)
 
+            val pool = buildDedupedPool(ragContextMap)
+
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
-                val formattedPrompt = buildCombinedPrompt(bpmnElements, ragContextMap)
+                val formattedPrompt = renderCombinedPrompt(bpmnElements, pool)
                 bpmnAnalysisAiServiceWithRag.analyzeWithRagContext(sessionId, formattedPrompt)
             }
 
@@ -53,7 +55,9 @@ class PromptBpmnAnalyzer(
 
             log.info { "BPMN Analysis Result (with RAG): $analysisResult" }
 
-            return AnalysisResponse.fromBpmnAnalysisResult(analysisResult, bpmnElements, amountOfRetries, ragContext)
+            return AnalysisResponse.fromBpmnAnalysisResult(
+                analysisResult, bpmnElements, amountOfRetries, ragContext, pool.flatten()
+            )
         } else {
             // Original path — unchanged from evaluation baseline
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
@@ -117,16 +121,20 @@ class PromptBpmnAnalyzer(
     // LLM prompt builder
     // -------------------------------------------------------------------------
 
+    private data class DedupedPool(
+        val entityLines: List<String>,
+        val relationshipLines: List<String>,
+        val documentLines: List<String>
+    ) {
+        fun flatten(): List<String> = entityLines + relationshipLines + documentLines
+    }
+
     /**
-     * Combines the RAG-retrieved legal context with the BPMN elements into a single prompt.
-     * Context is deduplicated across all elements to avoid repeating the same GDPR
-     * entities/documents multiple times, which would bloat the token count unnecessarily.
+     * Builds the deduplicated+capped pool fed into the analyzer prompt. The same lines
+     * are later reused as `retrieved_contexts` for Ragas so Faithfulness measures grounding
+     * against exactly what the LLM saw.
      */
-    private fun buildCombinedPrompt(
-        bpmnElements: Set<BpmnElement>,
-        ragContextMap: Map<String, String>
-    ): String = buildString {
-        // Deduplicated pools across all elements
+    private fun buildDedupedPool(ragContextMap: Map<String, String>): DedupedPool {
         val seenEntityLabels = mutableSetOf<String>()
         val seenRelKeys = mutableSetOf<String>()
         val seenDocIds = mutableSetOf<String>()
@@ -161,6 +169,37 @@ class PromptBpmnAnalyzer(
             }
         }
 
+        val entityLines = allEntities.take(20).map { e ->
+            val label = e["label"] ?: ""
+            val type  = e["type"]  ?: ""
+            val desc  = (e["description_text"] as? String)?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""
+            "[$type] $label$desc"
+        }
+
+        val relLines = allRels.take(15).map { r ->
+            val src   = r["source_label"] ?: ""
+            val tgt   = r["target_label"] ?: ""
+            val label = (r["label"] as? String)?.takeIf { it.isNotBlank() } ?: "relates to"
+            "$src → $tgt ($label)"
+        }
+
+        val docLines = allDocs.take(5).map { d ->
+            val preview = d["preview"] ?: d["content"] ?: ""
+            val sourceDoc = d["source_document"] as? String
+            if (sourceDoc != null) "[Source: $sourceDoc] \"$preview\"" else "\"$preview\""
+        }
+
+        return DedupedPool(entityLines, relLines, docLines)
+    }
+
+    /**
+     * Renders the prompt the LLM receives: section headers around the deduped pool,
+     * followed by the BPMN process elements.
+     */
+    private fun renderCombinedPrompt(
+        bpmnElements: Set<BpmnElement>,
+        pool: DedupedPool
+    ): String = buildString {
         appendLine("=== RETRIEVED GDPR KNOWLEDGE ===")
         appendLine(
             "The following unique knowledge was retrieved from a GDPR legal knowledge graph. " +
@@ -168,43 +207,25 @@ class PromptBpmnAnalyzer(
         )
         appendLine()
 
-        if (allEntities.isNotEmpty()) {
+        if (pool.entityLines.isNotEmpty()) {
             appendLine("Relevant GDPR Entities:")
-            allEntities.take(20).forEach { e ->
-                val label = e["label"] ?: ""
-                val type  = e["type"]  ?: ""
-                val desc  = (e["description_text"] as? String)?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""
-                appendLine("  • [$type] $label$desc")
-            }
+            pool.entityLines.forEach { appendLine("  • $it") }
             appendLine()
         }
 
-        if (allRels.isNotEmpty()) {
+        if (pool.relationshipLines.isNotEmpty()) {
             appendLine("Key Relationships:")
-            allRels.take(15).forEach { r ->
-                val src   = r["source_label"] ?: ""
-                val tgt   = r["target_label"] ?: ""
-                val label = (r["label"] as? String)?.takeIf { it.isNotBlank() } ?: "relates to"
-                appendLine("  • $src → $tgt ($label)")
-            }
+            pool.relationshipLines.forEach { appendLine("  • $it") }
             appendLine()
         }
 
-        if (allDocs.isNotEmpty()) {
+        if (pool.documentLines.isNotEmpty()) {
             appendLine("Supporting Legal Excerpts:")
-            allDocs.take(5).forEach { d ->
-                val preview = d["preview"] ?: d["content"] ?: ""
-                val sourceDoc = d["source_document"] as? String
-                if (sourceDoc != null) {
-                    appendLine("  [Source: $sourceDoc] \"$preview\"")
-                } else {
-                    appendLine("  \"$preview\"")
-                }
-            }
+            pool.documentLines.forEach { appendLine("  $it") }
             appendLine()
         }
 
-        if (allEntities.isEmpty() && allRels.isEmpty() && allDocs.isEmpty()) {
+        if (pool.entityLines.isEmpty() && pool.relationshipLines.isEmpty() && pool.documentLines.isEmpty()) {
             appendLine("  (No GDPR context retrieved.)")
             appendLine()
         }

@@ -26,3 +26,6 @@ gripl/gripl-rag/.env
 # Personal notes
 RUNNING.md
 .claude/settings.local.json
+check_datasets.py
+import_all_data.py
+import_evaluation_data.py

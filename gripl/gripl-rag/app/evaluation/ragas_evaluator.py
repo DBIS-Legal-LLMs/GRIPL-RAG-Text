@@ -160,7 +160,15 @@ async def _get_bundle() -> _EvaluatorBundle:
         if _bundle is not None:
             return _bundle
 
-        logger.info("Initialising Ragas evaluator bundle …")
+        effective_llm_model = settings.ragas_llm_model or settings.llm_model
+        logger.info(
+            "Initialising Ragas evaluator bundle — judge LLM: %s (binding=%s), "
+            "embeddings: %s (binding=%s)",
+            effective_llm_model,
+            settings.llm_binding,
+            settings.embedding_model,
+            settings.embedding_binding,
+        )
 
         from ragas.llms import LangchainLLMWrapper
         from ragas.embeddings import LangchainEmbeddingsWrapper

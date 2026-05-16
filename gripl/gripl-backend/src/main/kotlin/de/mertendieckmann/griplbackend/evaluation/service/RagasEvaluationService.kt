@@ -29,23 +29,24 @@ class RagasEvaluationService(
         analysisResponse: AnalysisResponse,
         bpmnElements: Set<BpmnElement>
     ): RagMetrics? {
-        val ragContext = analysisResponse.ragContext ?: return null
-        if (ragContext.isEmpty()) return null
+        // Use the exact deduplicated pool the analyzer's prompt was built from, so Faithfulness
+        // measures grounding against what the LLM actually saw (not the per-element display view).
+        val promptContexts = analysisResponse.ragPromptContext ?: return null
+        if (promptContexts.isEmpty()) return null
 
         val elementsById = bpmnElements.associateBy { it.id }
         val criticalById = analysisResponse.criticalElements.associateBy { it.id }
+        val ragContextById = analysisResponse.ragContext.orEmpty()
 
         val samples = criticalById.mapNotNull { (elementId, critical) ->
-            val ctx = ragContext[elementId] ?: return@mapNotNull null
+            if (critical.reason.isBlank()) return@mapNotNull null
             val element = elementsById[elementId]
-            val query = buildQuery(element, ctx)
-            val contexts = buildContextStrings(ctx)
-            if (contexts.isEmpty() || critical.reason.isBlank()) return@mapNotNull null
+            val ctx = ragContextById[elementId]
 
             RagasSampleRequest(
                 id = elementId,
-                query = query,
-                contexts = contexts,
+                query = buildQuery(element, ctx),
+                contexts = promptContexts,
                 response = critical.reason
             )
         }
@@ -53,6 +54,22 @@ class RagasEvaluationService(
         if (samples.isEmpty()) {
             log.info { "No scorable RAG samples for this test case (no critical elements with both context and explanation)." }
             return null
+        }
+
+        // One-shot diagnostic: print the first sample IN FULL so we can audit grounding by eye.
+        samples.firstOrNull()?.let { s ->
+            log.info {
+                buildString {
+                    appendLine("=== RAGAS SAMPLE AUDIT ===")
+                    appendLine("id: ${s.id}")
+                    appendLine("query: ${s.query}")
+                    appendLine("response (FULL):")
+                    appendLine(s.response)
+                    appendLine("contexts (${s.contexts.size}, FULL):")
+                    s.contexts.forEachIndexed { i, c -> appendLine("  [$i] $c") }
+                    appendLine("=== END RAGAS SAMPLE AUDIT ===")
+                }
+            }
         }
 
         return try {
@@ -69,32 +86,17 @@ class RagasEvaluationService(
         }
     }
 
-    private fun buildQuery(element: BpmnElement?, ctx: RagElementContext): String {
-        // Mirror what PromptBpmnAnalyzer sends to the RAG service: name + doc + pool + lane.
-        val parts = if (element != null) {
-            sequenceOf(element.name, element.documentation, element.poolName, element.laneName)
-        } else {
-            sequenceOf(ctx.activityName)
-        }
-        return parts.filterNotNull().filter { it.isNotBlank() }.joinToString(" - ")
-            .ifBlank { ctx.activityName ?: "" }
+    private fun buildQuery(element: BpmnElement?, ctx: RagElementContext?): String {
+        // Phrase as a question so Ragas' ResponseRelevancy (which generates synthetic
+        // questions from the response and embeds them) has a comparable user_input.
+        val name = element?.name ?: ctx?.activityName ?: "this BPMN activity"
+        val attrs = listOfNotNull(
+            element?.documentation?.takeIf { it.isNotBlank() }?.let { "documentation: $it" },
+            element?.poolName?.takeIf { it.isNotBlank() }?.let { "pool: $it" },
+            element?.laneName?.takeIf { it.isNotBlank() }?.let { "lane: $it" }
+        )
+        val suffix = if (attrs.isEmpty()) "" else " (${attrs.joinToString(", ")})"
+        return "Is the BPMN activity '$name'$suffix GDPR-critical, and if so, why?"
     }
 
-    private fun buildContextStrings(ctx: RagElementContext): List<String> {
-        val out = mutableListOf<String>()
-        ctx.entities.forEach { e ->
-            val desc = e.description.ifBlank { "" }
-            val line = listOf("[${e.type}] ${e.label}", desc).filter { it.isNotBlank() }.joinToString(" — ")
-            if (line.isNotBlank()) out += line
-        }
-        ctx.relationships.forEach { r ->
-            val line = "${r.source} → ${r.target} (${r.label.ifBlank { "relates to" }})"
-            out += line
-        }
-        ctx.documents.forEach { d ->
-            val text = d.content.ifBlank { d.preview }
-            if (text.isNotBlank()) out += text
-        }
-        return out
-    }
 }

@@ -7,7 +7,8 @@ import de.mertendieckmann.griplbackend.model.analysis.BpmnAnalysisResult
 data class AnalysisResponse(
     val criticalElements: List<CriticalElement>,
     val amountOfRetries: Int? = null,
-    val ragContext: Map<String, RagElementContext>? = null
+    val ragContext: Map<String, RagElementContext>? = null,
+    val ragPromptContext: List<String>? = null
 ) {
     data class CriticalElement(
         val id: String,
@@ -21,7 +22,8 @@ data class AnalysisResponse(
             result: BpmnAnalysisResult,
             bpmnElements: Set<BpmnElement>,
             amountOfRetries: Int,
-            ragContext: Map<String, RagElementContext>? = null
+            ragContext: Map<String, RagElementContext>? = null,
+            ragPromptContext: List<String>? = null
         ): AnalysisResponse {
             val elements = result.elements.map { element ->
                 CriticalElement(
@@ -37,7 +39,8 @@ data class AnalysisResponse(
             return AnalysisResponse(
                 criticalElements = elements,
                 amountOfRetries = amountOfRetries,
-                ragContext = ragContext
+                ragContext = ragContext,
+                ragPromptContext = ragPromptContext
             )
         }
 
