@@ -30,6 +30,7 @@ class BpmnExtractor {
                         id = element.id,
                         name = element.name,
                         documentation = element.documentations.joinToString { it.rawTextContent },
+                        isActivity = true,
                         poolName = bpmnModel.getModelElementsByType(Participant::class.java).find { it.getAttributeValue("processRef") == (element.parentElement as ProcessImpl).id }?.name,
                         laneName = element.parentElement
                             .getChildElementsByType(LaneSet::class.java)

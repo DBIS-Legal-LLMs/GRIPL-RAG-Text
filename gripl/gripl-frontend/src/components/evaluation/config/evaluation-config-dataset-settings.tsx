@@ -23,27 +23,55 @@ export default function EvaluationConfigDatasetSettings({
     onDatasetsChange,
     onTestCasesChange,
 }: EvaluationConfigDatasetSettingsProps) {
-    const [activeDatasetId, setActiveDatasetId] = useState<number | null>(null);
-    const [testCases, setTestCases] = useState<EvaluationDataMeta[]>([]);
-    const [loadingTestCases, setLoadingTestCases] = useState(false);
+    const [testCasesByDataset, setTestCasesByDataset] = useState<Record<number, EvaluationDataMeta[]>>({});
+    const [loadingDatasets, setLoadingDatasets] = useState<Record<number, boolean>>({});
+    const [expandedDatasetId, setExpandedDatasetId] = useState<number | null>(null);
 
+    // Fetch test cases for any selected dataset we haven't loaded yet.
     useEffect(() => {
-        if (activeDatasetId === null) return;
-        setLoadingTestCases(true);
-        getTestcasesByDataset(activeDatasetId).then((tcs) => {
-            setTestCases(tcs);
-            // default: all selected
-            onTestCasesChange(tcs.map((tc) => tc.id));
-            setLoadingTestCases(false);
-        });
-    }, [activeDatasetId]);
+        const missing = selectedDatasets.filter(
+            (id) => testCasesByDataset[id] === undefined && !loadingDatasets[id]
+        );
+        if (missing.length === 0) return;
 
-    function handleDatasetClick(datasetId: number) {
-        if (activeDatasetId === datasetId) return;
-        setActiveDatasetId(datasetId);
-        onDatasetsChange([datasetId]);
-        setTestCases([]);
-        onTestCasesChange([]);
+        setLoadingDatasets((prev) => {
+            const next = { ...prev };
+            missing.forEach((id) => (next[id] = true));
+            return next;
+        });
+
+        missing.forEach((datasetId) => {
+            getTestcasesByDataset(datasetId).then((tcs) => {
+                setTestCasesByDataset((prev) => ({ ...prev, [datasetId]: tcs }));
+                setLoadingDatasets((prev) => ({ ...prev, [datasetId]: false }));
+                // Default: newly loaded dataset's test cases are all selected.
+                onTestCasesChange(
+                    Array.from(new Set([...selectedTestCaseIds, ...tcs.map((tc) => tc.id)]))
+                );
+            });
+        });
+    }, [selectedDatasets]);
+
+    function toggleDataset(datasetId: number) {
+        const isSelected = selectedDatasets.includes(datasetId);
+        const isExpanded = expandedDatasetId === datasetId;
+
+        if (isSelected && isExpanded) {
+            // Second click on the currently expanded dataset deselects it.
+            const tcIds = (testCasesByDataset[datasetId] ?? []).map((tc) => tc.id);
+            onDatasetsChange(selectedDatasets.filter((id) => id !== datasetId));
+            if (tcIds.length > 0) {
+                onTestCasesChange(selectedTestCaseIds.filter((id) => !tcIds.includes(id)));
+            }
+            setExpandedDatasetId(null);
+        } else if (isSelected) {
+            // Already selected but collapsed — just expand it (collapsing any other).
+            setExpandedDatasetId(datasetId);
+        } else {
+            // Newly selected — select and expand, collapsing any other.
+            onDatasetsChange([...selectedDatasets, datasetId]);
+            setExpandedDatasetId(datasetId);
+        }
     }
 
     function toggleTestCase(id: number) {
@@ -54,15 +82,22 @@ export default function EvaluationConfigDatasetSettings({
         }
     }
 
-    const allSelected = testCases.length > 0 && testCases.every((tc) => selectedTestCaseIds.includes(tc.id));
-
-    function toggleAll() {
+    function toggleAllForDataset(datasetId: number) {
+        const tcs = testCasesByDataset[datasetId] ?? [];
+        const tcIds = tcs.map((tc) => tc.id);
+        const allSelected = tcIds.length > 0 && tcIds.every((id) => selectedTestCaseIds.includes(id));
         if (allSelected) {
-            onTestCasesChange([]);
+            onTestCasesChange(selectedTestCaseIds.filter((id) => !tcIds.includes(id)));
         } else {
-            onTestCasesChange(testCases.map((tc) => tc.id));
+            onTestCasesChange(Array.from(new Set([...selectedTestCaseIds, ...tcIds])));
         }
     }
+
+    const totalSelected = selectedTestCaseIds.length;
+    const totalAvailable = selectedDatasets.reduce(
+        (sum, id) => sum + (testCasesByDataset[id]?.length ?? 0),
+        0
+    );
 
     return (
         <Card>
@@ -71,66 +106,102 @@ export default function EvaluationConfigDatasetSettings({
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2">
-                    <Label>Select Dataset</Label>
+                    <Label>Select Datasets</Label>
                     <div className="flex flex-wrap gap-2">
-                        {datasets.map((ds) => (
-                            <button
-                                key={ds.id}
-                                onClick={() => handleDatasetClick(ds.id)}
-                                className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
-                                    activeDatasetId === ds.id
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
-                                }`}
-                            >
-                                {ds.name}
-                            </button>
-                        ))}
+                        {datasets.map((ds) => {
+                            const active = selectedDatasets.includes(ds.id);
+                            return (
+                                <button
+                                    key={ds.id}
+                                    onClick={() => toggleDataset(ds.id)}
+                                    className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                                        active
+                                            ? "bg-primary text-primary-foreground border-primary"
+                                            : "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
+                                    }`}
+                                >
+                                    {ds.name}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
-                {activeDatasetId !== null && (
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <Label>
-                                Test Cases
-                                {testCases.length > 0 && (
-                                    <span className="ml-2 text-muted-foreground font-normal">
-                                        ({selectedTestCaseIds.length}/{testCases.length} selected)
-                                    </span>
-                                )}
-                            </Label>
-                            {testCases.length > 0 && (
-                                <Button variant="ghost" size="sm" onClick={toggleAll}>
-                                    {allSelected ? "Deselect All" : "Select All"}
-                                </Button>
+                {selectedDatasets.length > 0 && (
+                    <div className="space-y-3">
+                        <Label>
+                            Test Cases
+                            {totalAvailable > 0 && (
+                                <span className="ml-2 text-muted-foreground font-normal">
+                                    ({totalSelected}/{totalAvailable} selected across {selectedDatasets.length} dataset
+                                    {selectedDatasets.length === 1 ? "" : "s"})
+                                </span>
                             )}
-                        </div>
+                        </Label>
 
-                        {loadingTestCases ? (
-                            <p className="text-sm text-muted-foreground">Loading...</p>
-                        ) : testCases.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No test cases found.</p>
-                        ) : (
-                            <div className="max-h-56 overflow-y-auto space-y-1 rounded-md border border-border p-2">
-                                {testCases.map((tc) => (
-                                    <div
-                                        key={tc.id}
-                                        className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer"
-                                        onClick={() => toggleTestCase(tc.id)}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedTestCaseIds.includes(tc.id)}
-                                            onChange={() => toggleTestCase(tc.id)}
-                                            className="h-4 w-4 rounded border-border accent-primary"
-                                            onClick={(e) => e.stopPropagation()}
-                                        />
-                                        <span className="text-sm truncate">{tc.name ?? `Test Case ${tc.id}`}</span>
+                        {selectedDatasets.map((datasetId) => {
+                            const isExpanded = expandedDatasetId === datasetId;
+                            if (!isExpanded) return null;
+
+                            const dataset = datasets.find((d) => d.id === datasetId);
+                            const tcs = testCasesByDataset[datasetId];
+                            const isLoading = loadingDatasets[datasetId];
+                            const tcIds = (tcs ?? []).map((tc) => tc.id);
+                            const allSelected =
+                                tcIds.length > 0 && tcIds.every((id) => selectedTestCaseIds.includes(id));
+                            const selectedHere = tcIds.filter((id) => selectedTestCaseIds.includes(id)).length;
+
+                            return (
+                                <div key={datasetId} className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium">
+                                            {dataset?.name ?? `Dataset ${datasetId}`}
+                                            {tcs && tcs.length > 0 && (
+                                                <span className="ml-2 text-muted-foreground font-normal">
+                                                    ({selectedHere}/{tcs.length})
+                                                </span>
+                                            )}
+                                        </span>
+                                        {tcs && tcs.length > 0 && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => toggleAllForDataset(datasetId)}
+                                            >
+                                                {allSelected ? "Deselect All" : "Select All"}
+                                            </Button>
+                                        )}
                                     </div>
-                                ))}
-                            </div>
-                        )}
+
+                                    {(isLoading || tcs === undefined ? (
+                                        <p className="text-sm text-muted-foreground">Loading...</p>
+                                    ) : tcs.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground">No test cases found.</p>
+                                    ) : (
+                                        <div className="max-h-56 overflow-y-auto space-y-1 rounded-md border border-border p-2">
+                                            {tcs.map((tc) => (
+                                                <div
+                                                    key={tc.id}
+                                                    className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer"
+                                                    onClick={() => toggleTestCase(tc.id)}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedTestCaseIds.includes(tc.id)}
+                                                        onChange={() => toggleTestCase(tc.id)}
+                                                        className="h-4 w-4 rounded border-border accent-primary"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                    <span className="text-sm truncate">
+                                                        {tc.name ?? `Test Case ${tc.id}`}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </CardContent>

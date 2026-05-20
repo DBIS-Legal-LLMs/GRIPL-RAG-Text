@@ -88,6 +88,8 @@ class PromptBpmnAnalyzer(
             bpmnElements
                 .map { element ->
                     async {
+                        if (!element.isActivity) return@async null
+
                         val queryText = sequenceOf(
                             element.name, element.documentation, element.poolName, element.laneName
                         )
@@ -135,56 +137,75 @@ class PromptBpmnAnalyzer(
      * against exactly what the LLM saw.
      */
     private fun buildDedupedPool(ragContextMap: Map<String, String>): DedupedPool {
-        val seenEntityLabels = mutableSetOf<String>()
-        val seenRelKeys = mutableSetOf<String>()
-        val seenDocIds = mutableSetOf<String>()
-
-        val allEntities = mutableListOf<Map<String, Any>>()
-        val allRels = mutableListOf<Map<String, Any>>()
-        val allDocs = mutableListOf<Map<String, Any>>()
+        val bestEntityRank = mutableMapOf<String, Int>()
+        val entityByLabel = mutableMapOf<String, Map<String, Any>>()
+        val bestRelRank = mutableMapOf<String, Int>()
+        val relByKey = mutableMapOf<String, Map<String, Any>>()
+        val bestDocRank = mutableMapOf<String, Int>()
+        val docById = mutableMapOf<String, Map<String, Any>>()
 
         ragContextMap.values.forEach { rawJson ->
             try {
                 val ctx = objectMapper.readValue<Map<String, Any>>(rawJson)
 
                 @Suppress("UNCHECKED_CAST")
-                (ctx["entities"] as? List<Map<String, Any>> ?: emptyList()).forEach eachEntity@{ e ->
-                    val label = (e["label"] as? String) ?: return@eachEntity
-                    if (seenEntityLabels.add(label)) allEntities += e
+                (ctx["entities"] as? List<Map<String, Any>> ?: emptyList()).forEachIndexed { rank, e ->
+                    val label = (e["label"] as? String) ?: return@forEachIndexed
+                    val prev = bestEntityRank[label]
+                    if (prev == null || rank < prev) {
+                        bestEntityRank[label] = rank
+                        entityByLabel[label] = e
+                    }
                 }
 
                 @Suppress("UNCHECKED_CAST")
-                (ctx["relationships"] as? List<Map<String, Any>> ?: emptyList()).forEach { r ->
+                (ctx["relationships"] as? List<Map<String, Any>> ?: emptyList()).forEachIndexed { rank, r ->
                     val key = "${r["source_label"]}|${r["label"]}|${r["target_label"]}"
-                    if (seenRelKeys.add(key)) allRels += r
+                    val prev = bestRelRank[key]
+                    if (prev == null || rank < prev) {
+                        bestRelRank[key] = rank
+                        relByKey[key] = r
+                    }
                 }
 
                 @Suppress("UNCHECKED_CAST")
-                (ctx["documents"] as? List<Map<String, Any>> ?: emptyList()).forEach eachDoc@{ d ->
-                    val docId = (d["source_document"] as? String) ?: (d["preview"] as? String) ?: return@eachDoc
-                    if (seenDocIds.add(docId)) allDocs += d
+                (ctx["documents"] as? List<Map<String, Any>> ?: emptyList()).forEachIndexed { rank, d ->
+                    val docId = (d["source_document"] as? String) ?: (d["preview"] as? String) ?: return@forEachIndexed
+                    val prev = bestDocRank[docId]
+                    if (prev == null || rank < prev) {
+                        bestDocRank[docId] = rank
+                        docById[docId] = d
+                    }
                 }
             } catch (e: Exception) {
                 log.warn { "Failed to parse RAG context JSON: ${e.message}" }
             }
         }
 
-        val entityLines = allEntities.take(20).map { e ->
+        val allEntities = bestEntityRank.entries.sortedBy { it.value }.mapNotNull { entityByLabel[it.key] }
+        val allRels = bestRelRank.entries.sortedBy { it.value }.mapNotNull { relByKey[it.key] }
+        val allDocs = bestDocRank.entries.sortedBy { it.value }.mapNotNull { docById[it.key] }
+
+        val entityLimit = (allEntities.size / 2).coerceIn(20, 40)
+        val relLimit    = (allRels.size / 2).coerceIn(15, 30)
+        val docLimit    = (allDocs.size / 2).coerceIn(5, 8)
+
+        val entityLines = allEntities.take(entityLimit).map { e ->
             val label = e["label"] ?: ""
             val type  = e["type"]  ?: ""
             val desc  = (e["description_text"] as? String)?.takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""
             "[$type] $label$desc"
         }
 
-        val relLines = allRels.take(15).map { r ->
+        val relLines = allRels.take(relLimit).map { r ->
             val src   = r["source_label"] ?: ""
             val tgt   = r["target_label"] ?: ""
             val label = (r["label"] as? String)?.takeIf { it.isNotBlank() } ?: "relates to"
             "$src → $tgt ($label)"
         }
 
-        val docLines = allDocs.take(5).map { d ->
-            val preview = d["preview"] ?: d["content"] ?: ""
+        val docLines = allDocs.take(docLimit).map { d ->
+            val preview = d["content"] ?: d["preview"] ?: ""
             val sourceDoc = d["source_document"] as? String
             if (sourceDoc != null) "[Source: $sourceDoc] \"$preview\"" else "\"$preview\""
         }

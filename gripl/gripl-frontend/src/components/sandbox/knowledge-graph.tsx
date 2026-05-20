@@ -121,16 +121,11 @@ export default function KnowledgeGraph({ entities, relationships, onNodeClick }:
         return { nodes, links };
     }, [entities, relationships]);
 
-    // Pin every node in place once the simulation settles — reads graphData
-    // via ref so the callback stays stable and never triggers a re-render.
-    const graphDataRef = useRef(graphData);
-    graphDataRef.current = graphData;
-
-    const handleEngineStop = useCallback(() => {
-        graphDataRef.current.nodes.forEach((node) => {
-            node.fx = node.x;
-            node.fy = node.y;
-        });
+    // Pin a node only after the user drags it, so it stays where they put it
+    // but the rest of the graph remains free to react to the force simulation.
+    const handleNodeDragEnd = useCallback((node: GraphNode) => {
+        node.fx = node.x;
+        node.fy = node.y;
     }, []);
 
     // paintNode has NO dependency on hover state — it reads the ref instead.
@@ -201,7 +196,7 @@ export default function KnowledgeGraph({ entities, relationships, onNodeClick }:
                 linkWidth={1.2}
                 linkDirectionalArrowLength={4}
                 linkDirectionalArrowRelPos={1}
-                onEngineStop={handleEngineStop}
+                onNodeDragEnd={handleNodeDragEnd as never}
                 onNodeClick={(node) => onNodeClick?.(node as unknown as RagEntity)}
                 onNodeHover={(node) => {
                     const n = node as GraphNode | null;

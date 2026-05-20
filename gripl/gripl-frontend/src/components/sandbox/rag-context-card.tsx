@@ -56,7 +56,7 @@ export default function RagContextCard({ ragContext, selectedElementId }: RagCon
                 )}
             </CollapsibleTrigger>
             <CollapsibleContent>
-            <div className="flex flex-col gap-3 max-h-[520px] overflow-y-auto">
+            <div className="flex flex-col gap-3">
                 {/* Activity tabs */}
                 <div className="flex flex-wrap gap-1.5 px-1 pt-1">
                     <button

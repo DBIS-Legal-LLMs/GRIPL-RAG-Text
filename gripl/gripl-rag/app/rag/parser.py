@@ -118,8 +118,11 @@ def parse_rag_response(raw_response: str) -> Dict:
             if m:
                 ref_id = m.group(1)
                 file_name = m.group(2).strip()
-                # Keep only the final path component (stem) without extension
-                file_name = re.sub(r"\.[^./\\]+$", "", file_name.replace("\\", "/").split("/")[-1])
+                # Keep only the final path component, stripping known doc extensions.
+                # Why: filenames like "..._v2.0_en" contain a dot inside the stem; a
+                # generic `\.[^.]+$` would eat ".0_en" and break the PDF lookup.
+                file_name = file_name.replace("\\", "/").split("/")[-1]
+                file_name = re.sub(r"\.(pdf|txt|md|html?|docx?)$", "", file_name, flags=re.IGNORECASE)
                 ref_map[ref_id] = file_name
 
     # -------------------------------

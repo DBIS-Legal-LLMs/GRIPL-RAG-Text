@@ -36,21 +36,46 @@ export default function PdfViewerModal({ open, onClose, documentName, exactText 
         setLocateResult(null);
         setCurrentPage(1);
 
-        fetch(`${RAG_BASE}/api/pdf/${encodeURIComponent(documentName)}/locate`, {
+        console.log("[PdfViewerModal] locate effect", {
+            documentName,
+            exactTextLength: exactText?.length ?? 0,
+            exactTextPreview: exactText?.slice(0, 80),
+        });
+
+        if (!exactText || exactText.length < 10) {
+            console.warn("[PdfViewerModal] exactText is empty or too short — skipping locate request");
+            return;
+        }
+
+        const url = `${RAG_BASE}/api/pdf/${encodeURIComponent(documentName)}/locate`;
+        console.log("[PdfViewerModal] POST", url);
+
+        fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text: exactText }),
         })
-            .then((res) => res.ok ? res.json() : null)
+            .then(async (res) => {
+                console.log("[PdfViewerModal] locate response", res.status, res.statusText);
+                if (!res.ok) {
+                    const body = await res.text().catch(() => "");
+                    console.error("[PdfViewerModal] locate failed:", res.status, body);
+                    return null;
+                }
+                return res.json();
+            })
             .then((data: PdfLocateResponse | null) => {
+                console.log("[PdfViewerModal] locate data", data);
                 if (data) {
                     setLocateResult(data);
                     if (data.page !== null) {
-                        setCurrentPage(data.page + 1); // react-pdf uses 1-based pages
+                        setCurrentPage(data.page + 1);
                     }
                 }
             })
-            .catch(() => {/* silently open on page 1 */});
+            .catch((err) => {
+                console.error("[PdfViewerModal] locate fetch threw:", err);
+            });
     }, [open, documentName, exactText]);
 
     const handlePageLoadSuccess = (page: { width: number }) => {

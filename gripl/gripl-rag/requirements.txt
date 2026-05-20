@@ -4,6 +4,7 @@
 
 # --- PDF extraction ---
 pymupdf>=1.27.0
+rapidfuzz>=3.0.0
 
 # --- LightRAG core ---
 lightrag-hku>=1.4.0

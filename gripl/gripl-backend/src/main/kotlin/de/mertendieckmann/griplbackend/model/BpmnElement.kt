@@ -7,6 +7,7 @@ data class BpmnElement(
     val documentation: String? = null,
     val poolName: String? = null,
     val laneName: String? = null,
+    val isActivity: Boolean = false,
     val outgoingFlowElementIds: List<String> = emptyList(),
     val incomingFlowElementIds: List<String> = emptyList(),
     val outgoingMessageFlowsToElementIds: List<String> = emptyList(),

@@ -186,7 +186,7 @@ async def _get_bundle() -> _EvaluatorBundle:
         metrics = {
             "faithfulness": Faithfulness(llm=evaluator_llm),
             "answer_relevancy": ResponseRelevancy(
-                llm=evaluator_llm, embeddings=evaluator_emb
+                llm=evaluator_llm, embeddings=evaluator_emb, strictness=1
             ),
         }
 

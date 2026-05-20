@@ -72,7 +72,7 @@ export default function Home() {
                           </TabsTrigger>
                       </TabsList>
                   </div>
-                  <CardContent className="pt-2 max-h-[400px] overflow-y-auto">
+                  <CardContent className="pt-2 max-h-[640px] overflow-y-auto">
                       <TabsContent value="reasoning">
                           <table className="w-full">
                               <thead>
