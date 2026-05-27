@@ -1,33 +1,60 @@
 services:
   gripl-frontend:
     build:
+      context: ./gripl/gripl-frontend
+      dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://gripl-backend:8080}
+        - NEXT_PUBLIC_API_BASE_URL=http://gripl-backend:8080
+    image: gripl-f:latest
+    container_name: gripl-frontend
+    restart: unless-stopped
     networks:
       - app
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "3000:3000"
 
   gripl-backend:
+    build:
+      context: ./gripl/gripl-backend
+      dockerfile: Dockerfile
+    image: gripl-b:latest
+    container_name: gripl-backend
+    restart: unless-stopped
+    depends_on:
+      - gripl-postgres
     env_file:
       - .env.local
     environment:
-      - FRONTEND_BASE_URL=http://localhost
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/${POSTGRES_DB:-gripldb}
-      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-postgres}
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+      - FRONTEND_BASE_URL=http://localhost:3000
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/gripldb
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+    volumes:
+      - playwright-browsers:/root/.cache/ms-playwright
     networks:
       - app
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "8000:8080"
 
   gripl-postgres:
-    env_file:
-      - .env.local
+    image: postgres:15
+    container_name: gripl-postgres
+    restart: unless-stopped
+    volumes:
+      - gripl-postgres-data:/var/lib/postgresql/data
+    networks:
+      - app
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=gripldb
+
+volumes:
+  playwright-browsers:
+  gripl-postgres-data:
 
 networks:
   app:
