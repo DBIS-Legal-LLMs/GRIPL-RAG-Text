@@ -8,7 +8,7 @@ Please ensure that you have the following installed and configured on your syste
 - Java JDK 21
 - Maven
 
-Copy the `.env.example` file to `.env` and configure all required environment variables, such as database connection details and (optionally) an OpenAI API key for process analysis. The `.env` file is used to configure the backend.
+If needed change the database connection settings in `src/main/resources/application.properties` to match your local Postgres configuration.
 
 ## Running Locally with Maven
 
