@@ -43,7 +43,7 @@ async def evaluate_ragas(request: RagasEvaluationRequest):
     try:
         result = await asyncio.wait_for(
             evaluate_samples(samples_payload, requested_metrics=request.metrics),
-            timeout=600.0,
+            timeout=1800.0,
         )
     except asyncio.TimeoutError:
         logger.error("Ragas evaluation timed out")

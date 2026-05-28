@@ -56,27 +56,33 @@ class RagasEvaluationService(
             return null
         }
 
-        // One-shot diagnostic: print the first sample IN FULL so we can audit grounding by eye.
-        samples.firstOrNull()?.let { s ->
+        samples.forEachIndexed { idx, s ->
             log.info {
                 buildString {
-                    appendLine("=== RAGAS SAMPLE AUDIT ===")
+                    appendLine("=== RAGAS SAMPLE AUDIT [${idx + 1}/${samples.size}] ===")
                     appendLine("id: ${s.id}")
                     appendLine("query: ${s.query}")
                     appendLine("response (FULL):")
                     appendLine(s.response)
                     appendLine("contexts (${s.contexts.size}, FULL):")
                     s.contexts.forEachIndexed { i, c -> appendLine("  [$i] $c") }
-                    appendLine("=== END RAGAS SAMPLE AUDIT ===")
+                    appendLine("=== END RAGAS SAMPLE AUDIT [${idx + 1}/${samples.size}] ===")
                 }
             }
         }
 
         return try {
-            val response = ragasApiClient.evaluate(RagasEvaluationRequest(samples = samples))
+            val response = ragasApiClient.evaluate(
+                RagasEvaluationRequest(
+                    samples = samples,
+                    metrics = listOf("faithfulness", "answer_relevancy", "context_utilization")
+                )
+            )
             RagMetrics(
                 faithfulness = response.aggregate.faithfulnessMean,
                 answerRelevancy = response.aggregate.answerRelevancyMean,
+                contextUtilization = response.aggregate.contextUtilizationMean,
+                contextRelevance = response.aggregate.contextRelevanceMean,
                 sampleCount = response.aggregate.sampleCount,
                 failedCount = response.aggregate.failedCount
             )

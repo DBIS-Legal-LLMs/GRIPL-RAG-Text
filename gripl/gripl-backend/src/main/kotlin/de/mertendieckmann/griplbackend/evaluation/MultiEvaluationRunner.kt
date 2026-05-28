@@ -59,7 +59,11 @@ class MultiEvaluationRunner(
 
     private fun createMetadata(request: MultiEvaluationRequest, seed: Int, repetitions: Int): EvaluationMetadataReport {
         val datasets = datasetRepository.getDatasetsByIds(request.datasets.map { it.toLong() })
-        val totalTestCases = evaluationDataRepository.countEvaluationDataForDatasets(request.datasets.map { it.toLong() })
+        val totalTestCases = if (request.evaluationDataIds.isNotEmpty()) {
+            request.evaluationDataIds.size
+        } else {
+            evaluationDataRepository.countEvaluationDataForDatasets(request.datasets.map { it.toLong() })
+        }
 
         return EvaluationMetadataReport(
             modelLabels = request.models.map { it.label },

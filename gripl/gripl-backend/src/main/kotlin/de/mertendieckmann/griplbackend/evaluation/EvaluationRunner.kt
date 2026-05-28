@@ -122,10 +122,15 @@ class EvaluationRunner(
                 TestCaseRagMetrics(
                     faithfulness = it.faithfulness,
                     answerRelevancy = it.answerRelevancy,
+                    contextUtilization = it.contextUtilization,
+                    contextRelevance = it.contextRelevance,
                     sampleCount = it.sampleCount,
                     failedCount = it.failedCount
                 )
-            }
+            },
+            // Expose the exact context bag sent to Ragas so the frontend can
+            // display it next to each test case for manual audit.
+            ragPromptContext = actualResult.analysisResponse.ragPromptContext
         )
 
         EvaluationOutcome.Success(testCaseReport, metrics)

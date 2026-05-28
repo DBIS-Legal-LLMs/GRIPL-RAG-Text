@@ -31,24 +31,26 @@ class RagasEvaluationRequest(BaseModel):
         default=None,
         description=(
             "Subset of metric names to run. Supported: "
-            "'context_precision', 'faithfulness', 'answer_relevancy'. "
-            "Defaults to all three if omitted."
+            "'faithfulness', 'answer_relevancy', 'context_utilization', "
+            "'context_relevance'. Defaults to all four if omitted."
         ),
     )
 
 
 class RagasSampleResult(BaseModel):
     id: str
-    context_precision: Optional[float] = None
     faithfulness: Optional[float] = None
     answer_relevancy: Optional[float] = None
+    context_utilization: Optional[float] = None
+    context_relevance: Optional[float] = None
     error: Optional[str] = None
 
 
 class RagasAggregate(BaseModel):
-    context_precision_mean: Optional[float] = None
     faithfulness_mean: Optional[float] = None
     answer_relevancy_mean: Optional[float] = None
+    context_utilization_mean: Optional[float] = None
+    context_relevance_mean: Optional[float] = None
     sample_count: int = 0
     failed_count: int = 0
 

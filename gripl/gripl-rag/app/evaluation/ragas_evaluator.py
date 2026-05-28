@@ -14,7 +14,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-SUPPORTED_METRICS = ("faithfulness", "answer_relevancy")
+SUPPORTED_METRICS = ("faithfulness", "answer_relevancy", "context_utilization", "context_relevance")
 
 
 @dataclass
@@ -173,6 +173,8 @@ async def _get_bundle() -> _EvaluatorBundle:
         from ragas.llms import LangchainLLMWrapper
         from ragas.embeddings import LangchainEmbeddingsWrapper
         from ragas.metrics import (
+            ContextRelevance,
+            ContextUtilization,
             Faithfulness,
             ResponseRelevancy,
         )
@@ -188,6 +190,8 @@ async def _get_bundle() -> _EvaluatorBundle:
             "answer_relevancy": ResponseRelevancy(
                 llm=evaluator_llm, embeddings=evaluator_emb, strictness=1
             ),
+            "context_utilization": ContextUtilization(llm=evaluator_llm),
+            "context_relevance": ContextRelevance(llm=evaluator_llm),
         }
 
         _bundle = _EvaluatorBundle(llm=evaluator_llm, embeddings=evaluator_emb, metrics=metrics)
@@ -208,7 +212,7 @@ def _build_sample(query: str, contexts: list[str], response: str):
     )
 
 
-_METRIC_TIMEOUT_SECONDS = 120.0
+_METRIC_TIMEOUT_SECONDS = 600.0
 
 
 async def _score_one(metric, sample) -> Optional[float]:

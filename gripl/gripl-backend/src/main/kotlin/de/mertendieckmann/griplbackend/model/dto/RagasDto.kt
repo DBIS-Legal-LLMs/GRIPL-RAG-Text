@@ -23,12 +23,16 @@ data class RagasSampleResult(
     val id: String,
     @JsonProperty("faithfulness") val faithfulness: Double? = null,
     @JsonProperty("answer_relevancy") val answerRelevancy: Double? = null,
+    @JsonProperty("context_utilization") val contextUtilization: Double? = null,
+    @JsonProperty("context_relevance") val contextRelevance: Double? = null,
     val error: String? = null
 )
 
 data class RagasAggregate(
     @JsonProperty("faithfulness_mean") val faithfulnessMean: Double? = null,
     @JsonProperty("answer_relevancy_mean") val answerRelevancyMean: Double? = null,
+    @JsonProperty("context_utilization_mean") val contextUtilizationMean: Double? = null,
+    @JsonProperty("context_relevance_mean") val contextRelevanceMean: Double? = null,
     @JsonProperty("sample_count") val sampleCount: Int = 0,
     @JsonProperty("failed_count") val failedCount: Int = 0
 )

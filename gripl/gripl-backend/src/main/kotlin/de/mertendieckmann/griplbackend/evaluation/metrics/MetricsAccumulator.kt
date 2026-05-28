@@ -25,6 +25,10 @@ class MetricsAccumulator {
     private var faithfulnessCount: Int = 0
     private var answerRelevancySum: Double = 0.0
     private var answerRelevancyCount: Int = 0
+    private var contextUtilizationSum: Double = 0.0
+    private var contextUtilizationCount: Int = 0
+    private var contextRelevanceSum: Double = 0.0
+    private var contextRelevanceCount: Int = 0
     private var ragSampleTotal: Int = 0
     private var ragFailedTotal: Int = 0
     private var ragEvaluatedTestCases: Int = 0
@@ -44,6 +48,8 @@ class MetricsAccumulator {
             ragFailedTotal += rag.failedCount
             rag.faithfulness?.let { faithfulnessSum += it; faithfulnessCount++ }
             rag.answerRelevancy?.let { answerRelevancySum += it; answerRelevancyCount++ }
+            rag.contextUtilization?.let { contextUtilizationSum += it; contextUtilizationCount++ }
+            rag.contextRelevance?.let { contextRelevanceSum += it; contextRelevanceCount++ }
         }
     }
 
@@ -73,6 +79,8 @@ class MetricsAccumulator {
             RagSummaryMetrics(
                 faithfulnessMean = if (faithfulnessCount > 0) faithfulnessSum / faithfulnessCount else null,
                 answerRelevancyMean = if (answerRelevancyCount > 0) answerRelevancySum / answerRelevancyCount else null,
+                contextUtilizationMean = if (contextUtilizationCount > 0) contextUtilizationSum / contextUtilizationCount else null,
+                contextRelevanceMean = if (contextRelevanceCount > 0) contextRelevanceSum / contextRelevanceCount else null,
                 evaluatedTestCases = ragEvaluatedTestCases,
                 totalSamples = ragSampleTotal,
                 failedSamples = ragFailedTotal

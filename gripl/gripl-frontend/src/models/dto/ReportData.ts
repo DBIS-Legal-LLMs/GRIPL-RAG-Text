@@ -15,6 +15,8 @@ export interface EvaluationMetadataReport {
 export interface TestCaseRagMetrics {
     faithfulness: number | null;
     answerRelevancy: number | null;
+    contextUtilization: number | null;
+    contextRelevance: number | null;
     sampleCount: number;
     failedCount: number;
 }
@@ -22,6 +24,8 @@ export interface TestCaseRagMetrics {
 export interface RagSummaryMetrics {
     faithfulnessMean: number | null;
     answerRelevancyMean: number | null;
+    contextUtilizationMean: number | null;
+    contextRelevanceMean: number | null;
     evaluatedTestCases: number;
     totalSamples: number;
     failedSamples: number;
@@ -42,6 +46,7 @@ export interface TestCaseReport {
     result: { value: string; reason?: string }[];
     amountOfRetries: number | null;
     ragMetrics?: TestCaseRagMetrics | null;
+    ragPromptContext?: string[] | null;
     markdown: string;
 }
 

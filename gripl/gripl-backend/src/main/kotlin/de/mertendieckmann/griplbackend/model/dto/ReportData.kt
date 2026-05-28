@@ -66,7 +66,8 @@ data class TestCaseReport(
     val isSuccessful: Boolean,
     val result: List<ExpectedValue>,
     val amountOfRetries: Int? = null,
-    val ragMetrics: TestCaseRagMetrics? = null
+    val ragMetrics: TestCaseRagMetrics? = null,
+    val ragPromptContext: List<String>? = null
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
@@ -74,8 +75,9 @@ data class TestCaseReport(
             """
             |
             |### RAG Metrics (Ragas)
-            |- **Faithfulness:** ${it.faithfulness?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |- **Context Utilization:** ${it.contextUtilization?.let { v -> "%.3f".format(v) } ?: "n/a"}
             |- **Answer Relevancy:** ${it.answerRelevancy?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |- **Faithfulness:** ${it.faithfulness?.let { v -> "%.3f".format(v) } ?: "n/a"}
             |- **Samples:** ${it.sampleCount} (failed: ${it.failedCount})
             """.trimMargin()
         } ?: ""
@@ -111,6 +113,8 @@ data class TestCaseReport(
 data class TestCaseRagMetrics(
     val faithfulness: Double? = null,
     val answerRelevancy: Double? = null,
+    val contextUtilization: Double? = null,
+    val contextRelevance: Double? = null,
     val sampleCount: Int = 0,
     val failedCount: Int = 0
 )
@@ -119,6 +123,8 @@ data class TestCaseRagMetrics(
 data class RagSummaryMetrics(
     val faithfulnessMean: Double? = null,
     val answerRelevancyMean: Double? = null,
+    val contextUtilizationMean: Double? = null,
+    val contextRelevanceMean: Double? = null,
     val evaluatedTestCases: Int = 0,
     val totalSamples: Int = 0,
     val failedSamples: Int = 0
@@ -148,6 +154,8 @@ data class EvaluationReportSummary(
             |### RAG Metrics (Ragas) — averaged across $evaluatedTestCasesText
             |Faithfulness: ${it.faithfulnessMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
             |Answer Relevancy: ${it.answerRelevancyMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |Context Utilization: ${it.contextUtilizationMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |Context Relevance: ${it.contextRelevanceMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
             |Total Samples Scored: ${it.totalSamples} (failed: ${it.failedSamples})
             """.trimMargin()
         } ?: ""

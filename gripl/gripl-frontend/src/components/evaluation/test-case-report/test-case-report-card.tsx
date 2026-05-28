@@ -12,6 +12,7 @@ import TestCaseReportCardReasoning from "@/components/evaluation/test-case-repor
 import TestCaseReportCardOverview from "@/components/evaluation/test-case-report/test-case-report-card-overview";
 import TestCaseReportCardComparison from "@/components/evaluation/test-case-report/test-case-report-card-comparison";
 import RagMetricsCard from "@/components/evaluation/rag-metrics-card";
+import RagPromptContextCard from "@/components/evaluation/rag-prompt-context-card";
 
 interface TestCaseReportCardProps {
     report: TestCaseReport
@@ -65,6 +66,12 @@ export default function TestCaseReportCard({ report }: TestCaseReportCardProps) 
                             <>
                                 <Separator />
                                 <RagMetricsCard testCase={report.ragMetrics} />
+                            </>
+                        )}
+                        {report.ragPromptContext && report.ragPromptContext.length > 0 && (
+                            <>
+                                <Separator />
+                                <RagPromptContextCard contexts={report.ragPromptContext} />
                             </>
                         )}
                         <Separator />
