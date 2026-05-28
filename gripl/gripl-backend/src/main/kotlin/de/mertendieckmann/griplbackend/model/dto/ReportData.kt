@@ -152,10 +152,9 @@ data class EvaluationReportSummary(
             """
             |
             |### RAG Metrics (Ragas) — averaged across $evaluatedTestCasesText
-            |Faithfulness: ${it.faithfulnessMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
-            |Answer Relevancy: ${it.answerRelevancyMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
             |Context Utilization: ${it.contextUtilizationMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
-            |Context Relevance: ${it.contextRelevanceMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |Answer Relevancy: ${it.answerRelevancyMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
+            |Faithfulness: ${it.faithfulnessMean?.let { v -> "%.3f".format(v) } ?: "n/a"}
             |Total Samples Scored: ${it.totalSamples} (failed: ${it.failedSamples})
             """.trimMargin()
         } ?: ""

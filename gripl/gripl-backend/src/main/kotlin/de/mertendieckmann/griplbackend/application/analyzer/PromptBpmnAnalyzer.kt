@@ -42,24 +42,29 @@ class PromptBpmnAnalyzer(
             // RAG-augmented path
             val ragContextMap = fetchRagContext(bpmnElements, ragMode)
 
-            val pool = buildDedupedPool(ragContextMap)
+            val perElementCtx = buildPerElementContext(ragContextMap, bpmnElements)
 
             log.info {
                 buildString {
-                    appendLine("=== DEDUPED POOL AUDIT (what the LLM actually receives) ===")
-                    appendLine("entities: ${pool.entityLines.size} | relationships: ${pool.relationshipLines.size} | documents: ${pool.documentLines.size}")
-                    appendLine("--- entityLines ---")
-                    pool.entityLines.forEach { appendLine("  • $it") }
-                    appendLine("--- relationshipLines ---")
-                    pool.relationshipLines.forEach { appendLine("  • $it") }
-                    appendLine("--- documentLines ---")
-                    pool.documentLines.forEach { appendLine("  • ${it.take(400)}") }
-                    appendLine("=== END DEDUPED POOL AUDIT ===")
+                    appendLine("=== PER-ELEMENT CONTEXT AUDIT (what the LLM actually receives) ===")
+                    appendLine("shared: ${perElementCtx.sharedItems.entities.size} entities | ${perElementCtx.sharedItems.relationships.size} rels | ${perElementCtx.sharedItems.documents.size} docs")
+                    appendLine("--- shared entities ---")
+                    perElementCtx.sharedItems.entities.forEach { (ref, line) -> appendLine("  [$ref] $line") }
+                    appendLine("--- shared relationships ---")
+                    perElementCtx.sharedItems.relationships.forEach { (ref, line) -> appendLine("  [$ref] $line") }
+                    appendLine("--- shared documents ---")
+                    perElementCtx.sharedItems.documents.forEach { (ref, line) -> appendLine("  [$ref] ${line.take(400)}") }
+                    appendLine("--- per-activity ---")
+                    perElementCtx.elementContexts.forEach { (_, ec) ->
+                        val refs = (ec.sharedEntityRefs + ec.sharedRelRefs + ec.sharedDocRefs).joinToString(", ") { "[$it]" }
+                        appendLine("  \"${ec.activityName}\" → shared: $refs | unique: ${ec.uniqueEntityLines.size}e / ${ec.uniqueRelLines.size}r / ${ec.uniqueDocLines.size}d")
+                    }
+                    appendLine("=== END PER-ELEMENT CONTEXT AUDIT ===")
                 }
             }
 
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
-                val formattedPrompt = renderCombinedPrompt(bpmnElements, pool)
+                val formattedPrompt = renderCombinedPrompt(bpmnElements, perElementCtx)
                 bpmnAnalysisAiServiceWithRag.analyzeWithRagContext(sessionId, formattedPrompt)
             }
 
@@ -70,7 +75,7 @@ class PromptBpmnAnalyzer(
             log.info { "BPMN Analysis Result (with RAG): $analysisResult" }
 
             return AnalysisResponse.fromBpmnAnalysisResult(
-                analysisResult, bpmnElements, amountOfRetries, ragContext, pool.flatten()
+                analysisResult, bpmnElements, amountOfRetries, ragContext, perElementCtx.flatten()
             )
         } else {
             // Original path — unchanged from evaluation baseline
@@ -233,9 +238,9 @@ class PromptBpmnAnalyzer(
         val allRels = bestRelRank.entries.sortedBy { it.value }.mapNotNull { relByKey[it.key] }
         val allDocs = bestDocRank.entries.sortedBy { it.value }.mapNotNull { docById[it.key] }
 
-        val entityLimit = (allEntities.size / 2).coerceIn(20, 40)
+        val entityLimit = (allEntities.size / 2).coerceIn(5, 10)
         val relLimit    = (allRels.size / 2).coerceIn(15, 30)
-        val docLimit    = (allDocs.size / 2).coerceIn(5, 8)
+        val docLimit    = (allDocs.size / 2).coerceIn(2, 3)
 
         val entityLines = allEntities.take(entityLimit).map { e ->
             val label = e["label"] ?: ""
