@@ -42,29 +42,24 @@ class PromptBpmnAnalyzer(
             // RAG-augmented path
             val ragContextMap = fetchRagContext(bpmnElements, ragMode)
 
-            val perElementCtx = buildPerElementContext(ragContextMap, bpmnElements)
+            val pool = buildDedupedPool(ragContextMap)
 
             log.info {
                 buildString {
-                    appendLine("=== PER-ELEMENT CONTEXT AUDIT (what the LLM actually receives) ===")
-                    appendLine("shared: ${perElementCtx.sharedItems.entities.size} entities | ${perElementCtx.sharedItems.relationships.size} rels | ${perElementCtx.sharedItems.documents.size} docs")
-                    appendLine("--- shared entities ---")
-                    perElementCtx.sharedItems.entities.forEach { (ref, line) -> appendLine("  [$ref] $line") }
-                    appendLine("--- shared relationships ---")
-                    perElementCtx.sharedItems.relationships.forEach { (ref, line) -> appendLine("  [$ref] $line") }
-                    appendLine("--- shared documents ---")
-                    perElementCtx.sharedItems.documents.forEach { (ref, line) -> appendLine("  [$ref] ${line.take(400)}") }
-                    appendLine("--- per-activity ---")
-                    perElementCtx.elementContexts.forEach { (_, ec) ->
-                        val refs = (ec.sharedEntityRefs + ec.sharedRelRefs + ec.sharedDocRefs).joinToString(", ") { "[$it]" }
-                        appendLine("  \"${ec.activityName}\" → shared: $refs | unique: ${ec.uniqueEntityLines.size}e / ${ec.uniqueRelLines.size}r / ${ec.uniqueDocLines.size}d")
-                    }
-                    appendLine("=== END PER-ELEMENT CONTEXT AUDIT ===")
+                    appendLine("=== DEDUPED POOL AUDIT (what the LLM actually receives) ===")
+                    appendLine("entities: ${pool.entityLines.size} | relationships: ${pool.relationshipLines.size} | documents: ${pool.documentLines.size}")
+                    appendLine("--- entityLines ---")
+                    pool.entityLines.forEach { appendLine("  • $it") }
+                    appendLine("--- relationshipLines ---")
+                    pool.relationshipLines.forEach { appendLine("  • $it") }
+                    appendLine("--- documentLines ---")
+                    pool.documentLines.forEach { appendLine("  • ${it.take(400)}") }
+                    appendLine("=== END DEDUPED POOL AUDIT ===")
                 }
             }
 
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
-                val formattedPrompt = renderCombinedPrompt(bpmnElements, perElementCtx)
+                val formattedPrompt = renderCombinedPrompt(bpmnElements, pool)
                 bpmnAnalysisAiServiceWithRag.analyzeWithRagContext(sessionId, formattedPrompt)
             }
 
@@ -75,7 +70,7 @@ class PromptBpmnAnalyzer(
             log.info { "BPMN Analysis Result (with RAG): $analysisResult" }
 
             return AnalysisResponse.fromBpmnAnalysisResult(
-                analysisResult, bpmnElements, amountOfRetries, ragContext, perElementCtx.flatten()
+                analysisResult, bpmnElements, amountOfRetries, ragContext, pool.flatten()
             )
         } else {
             // Original path — unchanged from evaluation baseline
