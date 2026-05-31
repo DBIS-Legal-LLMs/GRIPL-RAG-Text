@@ -6,10 +6,13 @@ import de.mertendieckmann.griplbackend.model.dto.ModelReportEnvelope
 import de.mertendieckmann.griplbackend.model.dto.MultiEvaluationRequest
 import de.mertendieckmann.griplbackend.repository.DatasetRepository
 import de.mertendieckmann.griplbackend.repository.EvaluationDataRepository
+import de.mertendieckmann.griplbackend.repository.EvaluationRunRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
@@ -17,43 +20,59 @@ import java.security.MessageDigest
 class MultiEvaluationRunner(
     private val singleRunner: EvaluationRunner,
     private val datasetRepository: DatasetRepository,
-    private val evaluationDataRepository: EvaluationDataRepository
+    private val evaluationDataRepository: EvaluationDataRepository,
+    private val evaluationRunRepository: EvaluationRunRepository
 ) {
     private val log = KotlinLogging.logger {}
 
     fun runAll(request: MultiEvaluationRequest): Flow<ModelReportEnvelope> = flow {
         require(request.models.isNotEmpty()) { "models must not be empty" }
 
-        val baseSeed = request.seed ?: (System.currentTimeMillis() * (Math.random() * 10) % Int.MAX_VALUE).toInt()
-        val repetitions = request.repetitions.coerceAtLeast(1)
-        emit(ModelReportEnvelope("", createMetadata(request, baseSeed, repetitions), 1))
+        val runId = withContext(Dispatchers.IO) { evaluationRunRepository.createRun() }
 
-        for (runNumber in 1..repetitions) {
-            log.info { "Starting evaluation run $runNumber/$repetitions" }
+        try {
+            val baseSeed = request.seed ?: (System.currentTimeMillis() * (Math.random() * 10) % Int.MAX_VALUE).toInt()
+            val repetitions = request.repetitions.coerceAtLeast(1)
 
-            for ((index, model) in request.models.withIndex()) {
-                val effectiveEndpoint = model.evaluationEndpoint ?: request.defaultEvaluationEndpoint
-                log.info { "Run $runNumber - Starting model ${index + 1}/${request.models.size}: '${model.label}' @ $effectiveEndpoint" }
+            val metadataEnvelope = ModelReportEnvelope("", createMetadata(request, baseSeed, repetitions), 1)
+            withContext(Dispatchers.IO) { evaluationRunRepository.saveEvent(runId, metadataEnvelope) }
+            emit(metadataEnvelope)
 
-                val runSeed = deriveRunSeed(baseSeed, runNumber)
+            for (runNumber in 1..repetitions) {
+                log.info { "Starting evaluation run $runNumber/$repetitions" }
 
-                val singleRequest = EvaluationRequest(
-                    evaluationEndpoint = effectiveEndpoint,
-                    llmProps = model.llmProps?.copy(seed = runSeed),
-                    maxConcurrent = request.maxConcurrent,
-                    datasets = request.datasets,
-                    evaluationDataIds = request.evaluationDataIds,
-                    useRag = request.useRag,
-                    ragMode = request.ragMode,
-                    evaluateRag = request.evaluateRag
-                )
+                for ((index, model) in request.models.withIndex()) {
+                    val effectiveEndpoint = model.evaluationEndpoint ?: request.defaultEvaluationEndpoint
+                    log.info { "Run $runNumber - Starting model ${index + 1}/${request.models.size}: '${model.label}' @ $effectiveEndpoint" }
 
-                singleRunner.run(singleRequest)
-                    .map { event -> ModelReportEnvelope(model.label, event, runNumber) }
-                    .collect { wrapped -> emit(wrapped) }
+                    val runSeed = deriveRunSeed(baseSeed, runNumber)
 
-                log.info { "Run $runNumber - Finished model '${model.label}'" }
+                    val singleRequest = EvaluationRequest(
+                        evaluationEndpoint = effectiveEndpoint,
+                        llmProps = model.llmProps?.copy(seed = runSeed),
+                        maxConcurrent = request.maxConcurrent,
+                        datasets = request.datasets,
+                        evaluationDataIds = request.evaluationDataIds,
+                        useRag = request.useRag,
+                        ragMode = request.ragMode,
+                        evaluateRag = request.evaluateRag
+                    )
+
+                    singleRunner.run(singleRequest)
+                        .map { event -> ModelReportEnvelope(model.label, event, runNumber) }
+                        .collect { wrapped ->
+                            withContext(Dispatchers.IO) { evaluationRunRepository.saveEvent(runId, wrapped) }
+                            emit(wrapped)
+                        }
+
+                    log.info { "Run $runNumber - Finished model '${model.label}'" }
+                }
             }
+
+            withContext(Dispatchers.IO) { evaluationRunRepository.completeRun(runId) }
+        } catch (e: Exception) {
+            withContext(Dispatchers.IO) { evaluationRunRepository.failRun(runId) }
+            throw e
         }
     }
 

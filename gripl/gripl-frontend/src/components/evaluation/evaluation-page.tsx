@@ -26,6 +26,7 @@ import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluat
 import MetricChart from "@/components/evaluation/charts/aggregated/metric-chart";
 import {ColorProvider, useColors} from "@/components/evaluation/charts/common/color-context";
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
+import PastRunsPanel from "@/components/evaluation/past-runs-panel";
 
 type ModelReportEnvelope = {
     modelLabel: string;
@@ -56,26 +57,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
 
     const { colors, setColors } = useColors()
 
-    const handleEvaluationStart = async () => {
-        if (!evaluationRequest) return;
-
-        setMetadata(null);
-        setTestCasesByRun(new Map());
-        setSummaryByRun(new Map());
-        setCurrentStepInfos([]);
-        setErrorsByRun(new Map());
-        setIsLoading(true);
-        setIsFinished(false);
-        setSelectedRun(1);
-
-        console.log("Sending request", evaluationRequest)
-
-        const res = await fetch(`/api/gdpr/evaluation/stream`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(evaluationRequest)
-        });
-
+    const processNdjsonStream = async (res: Response) => {
         if (!res.ok || !res.body) {
             console.error("Request failed:", res.status, res.statusText);
             setIsLoading(false);
@@ -100,8 +82,6 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 try {
                     const env = JSON.parse(line) as ModelReportEnvelope;
                     const { modelLabel, report, runNumber } = env;
-
-                    console.log(`Received report for model: ${modelLabel}, run: ${runNumber}`, report);
 
                     if (report.type === "metadata") {
                         setMetadata(report);
@@ -142,6 +122,35 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
 
         setIsLoading(false);
         setIsFinished(true);
+    };
+
+    const resetState = () => {
+        setMetadata(null);
+        setTestCasesByRun(new Map());
+        setSummaryByRun(new Map());
+        setCurrentStepInfos([]);
+        setErrorsByRun(new Map());
+        setIsLoading(true);
+        setIsFinished(false);
+        setSelectedRun(1);
+    };
+
+    const handleEvaluationStart = async () => {
+        if (!evaluationRequest) return;
+        resetState();
+        console.log("Sending request", evaluationRequest);
+        const res = await fetch(`/api/gdpr/evaluation/stream`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(evaluationRequest)
+        });
+        await processNdjsonStream(res);
+    };
+
+    const handleLoadRun = async (runId: number) => {
+        resetState();
+        const res = await fetch(`/api/gdpr/evaluation/runs/${runId}/stream`);
+        await processNdjsonStream(res);
     };
 
     useEffect(() => {
@@ -478,6 +487,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
 
     return (
         <div className="w-full">
+            <PastRunsPanel onLoadRun={handleLoadRun} isLoading={isLoading} />
             <EvaluationConfig onMultiConfigChanged={setEvaluationRequest} datasets={datasets} className="mb-6">
                 <div className="flex flex-row justify-between items-start flex-wrap mb-4 gap-4">
                     <div className="flex flex-row gap-4 flex-wrap">
