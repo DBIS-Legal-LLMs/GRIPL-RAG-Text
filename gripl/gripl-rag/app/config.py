@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     embedding_api_base: str = ""       # Only for openai binding
 
     # --- Rerank Settings ---
-    rerank_model: str = "cohere/rerank-4-pro"
+    rerank_binding: str = "local"  # "local" or "cohere"
+    rerank_model: str = "BAAI/bge-reranker-v2-m3"
     rerank_api_key: str = ""
     rerank_api_base: str = "https://openrouter.ai/api/v1/rerank"
     rerank_top_n: int = 10

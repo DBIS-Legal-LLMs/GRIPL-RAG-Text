@@ -192,18 +192,39 @@ def _get_embedding_func():
 
 
 def _get_rerank_func():
-    if not settings.rerank_api_key:
-        return None
+    if settings.rerank_binding == "local":
+        import asyncio
+        from sentence_transformers import CrossEncoder
 
-    from functools import partial
-    from lightrag.rerank import cohere_rerank
+        logger.info("Loading local reranker: %s", settings.rerank_model)
+        _model = CrossEncoder(settings.rerank_model)
 
-    return partial(
-        cohere_rerank,
-        api_key=settings.rerank_api_key,
-        model=settings.rerank_model,
-        base_url=settings.rerank_api_base,
-    )
+        async def _local_rerank(query: str, documents: list, top_n: int = None):
+            pairs = [(query, doc) for doc in documents]
+            scores = await asyncio.to_thread(_model.predict, pairs)
+            ranked = sorted(
+                [{"index": i, "relevance_score": float(s)} for i, s in enumerate(scores)],
+                key=lambda x: x["relevance_score"],
+                reverse=True,
+            )
+            return ranked[:top_n] if top_n else ranked
+
+        return _local_rerank
+
+    if settings.rerank_binding == "cohere":
+        if not settings.rerank_api_key:
+            return None
+        from functools import partial
+        from lightrag.rerank import cohere_rerank
+
+        return partial(
+            cohere_rerank,
+            api_key=settings.rerank_api_key,
+            model=settings.rerank_model,
+            base_url=settings.rerank_api_base,
+        )
+
+    return None
 
 
 async def create_rag_instance() -> LightRAG:

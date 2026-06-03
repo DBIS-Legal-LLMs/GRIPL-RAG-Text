@@ -9,6 +9,9 @@ rapidfuzz>=3.0.0
 # --- LightRAG core ---
 lightrag-hku>=1.4.0
 
+# --- Local reranker (BAAI/bge-reranker-v2-m3) ---
+sentence-transformers>=3.0.0
+
 # --- Google Gemini SDK ---
 google-genai>=1.0.0
 
