@@ -75,14 +75,12 @@ class RagasEvaluationService(
             val response = ragasApiClient.evaluate(
                 RagasEvaluationRequest(
                     samples = samples,
-                    metrics = listOf("faithfulness", "answer_relevancy", "context_utilization")
+                    metrics = listOf("faithfulness", "context_utilization")
                 )
             )
             RagMetrics(
                 faithfulness = response.aggregate.faithfulnessMean,
-                answerRelevancy = response.aggregate.answerRelevancyMean,
                 contextUtilization = response.aggregate.contextUtilizationMean,
-                contextRelevance = response.aggregate.contextRelevanceMean,
                 sampleCount = response.aggregate.sampleCount,
                 failedCount = response.aggregate.failedCount
             )

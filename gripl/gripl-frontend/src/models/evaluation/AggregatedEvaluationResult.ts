@@ -23,12 +23,8 @@ export interface AggregatedEvaluationResult {
     stdTrueNegatives: number
     avgAmountOfRetries: number | undefined
     stdAmountOfRetries: number | undefined
-    avgAnswerRelevancy: number | undefined
-    stdAnswerRelevancy: number | undefined
     avgContextUtilization: number | undefined
     stdContextUtilization: number | undefined
-    avgContextRelevance: number | undefined
-    stdContextRelevance: number | undefined
     avgFaithfulness: number | undefined
     stdFaithfulness: number | undefined
     ragRunsCounted: number

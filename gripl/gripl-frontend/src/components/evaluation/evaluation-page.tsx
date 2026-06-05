@@ -193,9 +193,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
             const falsePositives: number[] = [];
             const falseNegatives: number[] = [];
             const trueNegatives: number[] = [];
-            const answerRelevancies: number[] = [];
             const contextUtilizations: number[] = [];
-            const contextRelevances: number[] = [];
             const faithfulnesses: number[] = [];
 
             for (const [runNum, runSummaries] of summaryByRun.entries()) {
@@ -215,14 +213,8 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     falsePositives.push(modelSummary.totalFalsePositives);
                     falseNegatives.push(modelSummary.totalFalseNegatives);
                     trueNegatives.push(modelSummary.totalTrueNegatives);
-                    if (modelSummary.ragMetrics?.answerRelevancyMean !== null && modelSummary.ragMetrics?.answerRelevancyMean !== undefined) {
-                        answerRelevancies.push(modelSummary.ragMetrics.answerRelevancyMean);
-                    }
                     if (modelSummary.ragMetrics?.contextUtilizationMean !== null && modelSummary.ragMetrics?.contextUtilizationMean !== undefined) {
                         contextUtilizations.push(modelSummary.ragMetrics.contextUtilizationMean);
-                    }
-                    if (modelSummary.ragMetrics?.contextRelevanceMean !== null && modelSummary.ragMetrics?.contextRelevanceMean !== undefined) {
-                        contextRelevances.push(modelSummary.ragMetrics.contextRelevanceMean);
                     }
                     if (modelSummary.ragMetrics?.faithfulnessMean !== null && modelSummary.ragMetrics?.faithfulnessMean !== undefined) {
                         faithfulnesses.push(modelSummary.ragMetrics.faithfulnessMean);
@@ -251,15 +243,11 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 const avgAmountOfRetries = amountOfRetries.length > 0 ? amountOfRetries.reduce((a, b) => a + b, 0) / amountOfRetries.length : undefined;
                 const stdAmountOfRetries = amountOfRetries.length > 0 ? Math.sqrt(amountOfRetries.reduce((sum, val) => sum + Math.pow(val - (avgAmountOfRetries || 0), 2), 0) / amountOfRetries.length) : undefined;
 
-                const avgAnswerRelevancy = answerRelevancies.length > 0 ? answerRelevancies.reduce((a, b) => a + b, 0) / answerRelevancies.length : undefined;
-                const stdAnswerRelevancy = answerRelevancies.length > 0 ? Math.sqrt(answerRelevancies.reduce((sum, val) => sum + Math.pow(val - (avgAnswerRelevancy || 0), 2), 0) / answerRelevancies.length) : undefined;
                 const avgContextUtilization = contextUtilizations.length > 0 ? contextUtilizations.reduce((a, b) => a + b, 0) / contextUtilizations.length : undefined;
                 const stdContextUtilization = contextUtilizations.length > 0 ? Math.sqrt(contextUtilizations.reduce((sum, val) => sum + Math.pow(val - (avgContextUtilization || 0), 2), 0) / contextUtilizations.length) : undefined;
-                const avgContextRelevance = contextRelevances.length > 0 ? contextRelevances.reduce((a, b) => a + b, 0) / contextRelevances.length : undefined;
-                const stdContextRelevance = contextRelevances.length > 0 ? Math.sqrt(contextRelevances.reduce((sum, val) => sum + Math.pow(val - (avgContextRelevance || 0), 2), 0) / contextRelevances.length) : undefined;
                 const avgFaithfulness = faithfulnesses.length > 0 ? faithfulnesses.reduce((a, b) => a + b, 0) / faithfulnesses.length : undefined;
                 const stdFaithfulness = faithfulnesses.length > 0 ? Math.sqrt(faithfulnesses.reduce((sum, val) => sum + Math.pow(val - (avgFaithfulness || 0), 2), 0) / faithfulnesses.length) : undefined;
-                const ragRunsCounted = Math.max(answerRelevancies.length, contextUtilizations.length, contextRelevances.length, faithfulnesses.length);
+                const ragRunsCounted = Math.max(contextUtilizations.length, faithfulnesses.length);
 
                 const avgTruePositives = truePositives.reduce((a, b) => a + b, 0) / truePositives.length;
                 const avgFalsePositives = falsePositives.reduce((a, b) => a + b, 0) / falsePositives.length;
@@ -287,6 +275,8 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     stdErrors,
                     avgAmountOfRetries,
                     stdAmountOfRetries,
+                    avgContextUtilization,
+                    stdContextUtilization,
                     avgTruePositives,
                     stdTruePositives,
                     avgFalsePositives,
@@ -295,12 +285,6 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     stdFalseNegatives,
                     avgTrueNegatives,
                     stdTrueNegatives,
-                    avgAnswerRelevancy,
-                    stdAnswerRelevancy,
-                    avgContextUtilization,
-                    stdContextUtilization,
-                    avgContextRelevance,
-                    stdContextRelevance,
                     avgFaithfulness,
                     stdFaithfulness,
                     ragRunsCounted
@@ -346,9 +330,6 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                     sections.push(`\n### RAG Metrics (averaged across ${stats.ragRunsCounted} run(s))`);
                     if (stats.avgContextUtilization !== undefined && stats.stdContextUtilization !== undefined) {
                         sections.push(`- Context Utilization: ${stats.avgContextUtilization.toFixed(3)} ± ${stats.stdContextUtilization.toFixed(3)}`);
-                    }
-                    if (stats.avgAnswerRelevancy !== undefined && stats.stdAnswerRelevancy !== undefined) {
-                        sections.push(`- Answer Relevancy: ${stats.avgAnswerRelevancy.toFixed(3)} ± ${stats.stdAnswerRelevancy.toFixed(3)}`);
                     }
                     if (stats.avgFaithfulness !== undefined && stats.stdFaithfulness !== undefined) {
                         sections.push(`- Faithfulness: ${stats.avgFaithfulness.toFixed(3)} ± ${stats.stdFaithfulness.toFixed(3)}`);
@@ -634,13 +615,6 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                                         description="Context Utilization (mean ± SD)"
                                         metricKey="avgContextUtilization"
                                         stdKey="stdContextUtilization"
-                                        aggregatedEvaluationResults={aggregateStats}
-                                    />
-                                    <MetricChart
-                                        title="Answer Relevancy"
-                                        description="Answer Relevancy (mean ± SD)"
-                                        metricKey="avgAnswerRelevancy"
-                                        stdKey="stdAnswerRelevancy"
                                         aggregatedEvaluationResults={aggregateStats}
                                     />
                                     <MetricChart

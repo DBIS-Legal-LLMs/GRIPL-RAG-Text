@@ -70,6 +70,7 @@ services:
     volumes:
       - ./gripl/gripl-rag/rag_working_dir:/app/rag_working_dir
       - ./gripl/gripl-rag/data:/app/data
+      - huggingface_cache:/root/.cache/huggingface
     networks:
       - app
 
@@ -101,3 +102,4 @@ volumes:
   neo4j_data:
     name: gripl-neo4j-data
     external: true
+  huggingface_cache:

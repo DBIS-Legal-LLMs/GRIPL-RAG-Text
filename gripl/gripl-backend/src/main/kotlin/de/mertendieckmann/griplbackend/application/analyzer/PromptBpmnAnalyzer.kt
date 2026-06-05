@@ -109,6 +109,7 @@ class PromptBpmnAnalyzer(
                         )
                             .filterNotNull()
                             .filter { it.isNotBlank() }
+                            .filter { it.length > 3 && !it.matches(Regex("""[\d/.\-]+""")) }
                             .joinToString(" - ")
 
                         if (queryText.isNotBlank()) {

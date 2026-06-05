@@ -184,7 +184,7 @@ export default function EvaluationConfigDefaultSettings(props: EvaluationConfigD
                                 <div>
                                     <Label htmlFor="evaluate-rag-toggle">Evaluate RAG Quality (Ragas)</Label>
                                     <p className="text-xs text-muted-foreground">
-                                        Scores context utilization, answer relevancy, and faithfulness using an LLM judge.
+                                        Scores context utilization and faithfulness using an LLM judge.
                                         Adds latency per test case.
                                     </p>
                                 </div>

@@ -26,15 +26,20 @@ router = APIRouter(prefix="/api", tags=["RAG"])
 # Module-level RAG singleton (initialised lazily on first query)
 # ---------------------------------------------------------------------------
 _rag_instance = None
+_rag_init_lock = asyncio.Lock()
+
 
 
 async def _get_rag():
     """Return (and cache) the LightRAG instance."""
     global _rag_instance
-    if _rag_instance is None:
-        logger.info("Initialising LightRAG instance …")
-        _rag_instance = await create_rag_instance()
-        logger.info("LightRAG instance ready.")
+    if _rag_instance is not None:
+        return _rag_instance
+    async with _rag_init_lock:
+        if _rag_instance is None:
+            logger.info("Initialising LightRAG instance …")
+            _rag_instance = await create_rag_instance()
+            logger.info("LightRAG instance ready.")
     return _rag_instance
 
 
@@ -69,7 +74,7 @@ async def query_rag(request: QueryRequest):
                     request.query,
                     param=QueryParam(mode=mode, only_need_context=True),
                 ),
-                timeout=60.0
+                timeout=300.0
             )
         except asyncio.TimeoutError:
             logger.error("LightRAG query timed out")

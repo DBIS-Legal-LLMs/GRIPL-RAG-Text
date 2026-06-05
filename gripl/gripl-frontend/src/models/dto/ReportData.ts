@@ -14,18 +14,14 @@ export interface EvaluationMetadataReport {
 
 export interface TestCaseRagMetrics {
     faithfulness: number | null;
-    answerRelevancy: number | null;
     contextUtilization: number | null;
-    contextRelevance: number | null;
     sampleCount: number;
     failedCount: number;
 }
 
 export interface RagSummaryMetrics {
     faithfulnessMean: number | null;
-    answerRelevancyMean: number | null;
     contextUtilizationMean: number | null;
-    contextRelevanceMean: number | null;
     evaluatedTestCases: number;
     totalSamples: number;
     failedSamples: number;

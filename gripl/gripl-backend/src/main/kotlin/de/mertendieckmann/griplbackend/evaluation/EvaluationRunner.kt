@@ -83,10 +83,13 @@ class EvaluationRunner(
             log.warn { "RAG context missing or empty -> proceeding with evaluation but metrics might be affected for ${entry.id}" }
         }
 
-        val ragMetrics: RagMetrics? = if (evaluationRequest.evaluateRag) {
+        val ragMetrics: RagMetrics? = if (evaluationRequest.evaluateRag && actualActivityIds.isNotEmpty()) {
             val bpmnElements = bpmnExtractor.extractBpmnElements(entry.bpmnXml)
             ragasEvaluationService.scoreTestCase(actualResult.analysisResponse, bpmnElements)
         } else {
+            if (evaluationRequest.evaluateRag && actualActivityIds.isEmpty()) {
+                log.info { "Skipping RAGAS evaluation for ${entry.id}: LLM returned no critical elements, nothing to score faithfulness against" }
+            }
             null
         }
 
@@ -121,9 +124,7 @@ class EvaluationRunner(
             ragMetrics = ragMetrics?.let {
                 TestCaseRagMetrics(
                     faithfulness = it.faithfulness,
-                    answerRelevancy = it.answerRelevancy,
                     contextUtilization = it.contextUtilization,
-                    contextRelevance = it.contextRelevance,
                     sampleCount = it.sampleCount,
                     failedCount = it.failedCount
                 )

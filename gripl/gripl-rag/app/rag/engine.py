@@ -191,6 +191,8 @@ def _get_embedding_func():
         )
 
 
+_MAX_RERANK_DOCS = 20  # cap before CPU inference to bound latency on constrained Docker CPU
+
 def _get_rerank_func():
     if settings.rerank_binding == "local":
         import asyncio
@@ -200,8 +202,13 @@ def _get_rerank_func():
         _model = CrossEncoder(settings.rerank_model)
 
         async def _local_rerank(query: str, documents: list, top_n: int = None):
-            pairs = [(query, doc) for doc in documents]
-            scores = await asyncio.to_thread(_model.predict, pairs)
+            docs = documents[:_MAX_RERANK_DOCS]
+            pairs = [(query, doc) for doc in docs]
+
+            def _predict():
+                return _model.predict(pairs, batch_size=8, show_progress_bar=False)
+
+            scores = await asyncio.to_thread(_predict)
             ranked = sorted(
                 [{"index": i, "relevance_score": float(s)} for i, s in enumerate(scores)],
                 key=lambda x: x["relevance_score"],
