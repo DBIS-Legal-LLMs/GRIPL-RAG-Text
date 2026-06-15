@@ -195,8 +195,14 @@ export default function BpmnEditor({ title, bpmnXml, highlightedActivityIds = []
       if (!styleElementRef.current) {
         const styleElement = document.createElement("style")
         styleElement.textContent = `
-          .highlight-privacy .djs-visual > :nth-child(1) {
-            fill: hsl(var(--destructive) / 50%) !important;
+          /* Fill every shape primitive (rect, circle, polygon, path) with the SAME
+             OPAQUE tint. Using an opaque colour (a 50/50 mix of destructive and the
+             canvas background, so it still looks like a light red) means overlapping
+             fills — e.g. a message event's circle and envelope — don't compound into
+             a darker patch. We only set fill, never stroke or opacity, so the
+             element outline and the label text keep their normal colour. */
+          .highlight-privacy .djs-visual > :not(text):not(tspan) {
+            fill: color-mix(in srgb, hsl(var(--destructive)) 50%, hsl(var(--background))) !important;
           }
         `
         document.head.appendChild(styleElement)

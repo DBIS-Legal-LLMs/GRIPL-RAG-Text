@@ -16,9 +16,9 @@ object BaselineBpmnAnalysisAiServiceFactory {
     }
 
     private fun getPrompt(): String {
-        return """ 
-            Your task is to identify and return a list of the IDs of all Activity (Task) elements that process personal data. 
-            Ignore all other element types.
+        return """
+            Your task is to identify and return a list of the IDs of all BPMN elements that process personal data.
+            Consider activities/tasks, events, gateways, and data objects/data stores; ignore all other element types.
         """.trimIndent()
     }
 }

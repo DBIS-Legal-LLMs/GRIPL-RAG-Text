@@ -13,6 +13,7 @@ data class AnalysisResponse(
     data class CriticalElement(
         val id: String,
         val name: String?,
+        val type: String? = null,
         val reason: String,
         val references: List<LlmReference> = emptyList()
     )
@@ -26,9 +27,13 @@ data class AnalysisResponse(
             ragPromptContext: List<String>? = null
         ): AnalysisResponse {
             val elements = result.elements.map { element ->
+                val bpmnElement = bpmnElements.find { it.id == element.id }
                 CriticalElement(
                     id = element.id,
-                    name = bpmnElements.find { it.id == element.id }?.name,
+                    // Prefer the element's real BPMN name; fall back to the label the
+                    // LLM generated from surrounding context for unnamed elements.
+                    name = bpmnElement?.name?.takeIf { it.isNotBlank() } ?: element.label,
+                    type = bpmnElement?.type,
                     reason = element.reason,
                     references = element.references.map { ref ->
                         LlmReference(exactText = ref.exactText, sourceDocument = ref.sourceDocument)

@@ -10,6 +10,7 @@ export interface AnalysisResponse {
 export interface CriticalElement {
     id: string;
     name: string;
+    type?: string;
     reason: string;
     references?: LlmReference[];
 }
