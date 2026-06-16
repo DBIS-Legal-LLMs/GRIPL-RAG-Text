@@ -15,6 +15,8 @@ The datasets are provided as CSV exports of the database and can be imported to 
 
 ## Docker Setup
 
+> NOTE: The Production hosting is still under development, for local setup refer to [Run Locally](#1-run-locally)
+
 This project can be run in different environments by **composing multiple docker-compose files**.
 
 This project provides:
@@ -45,18 +47,24 @@ Attention: If you are using **Linux**:
 
 ### 1. Run locally
 
+The local setup is described in the `docker-compose.local.yml`
+
+First you need to build the docker image:
+
 ```bash
-cp .env.local.example .env.local
-
-# Fill out .env.local as needed
-
-docker compose --env-file .env.local -f docker-compose.yml -f docker-compose.local.yml up -d
+docker compose -f docker-compose.local.yml build
 ```
 
-You will then have:
+Then you can start the system
 
-* frontend: [http://localhost](http://localhost)
-* backend: [http://localhost/api](http://localhost/api)
+```bash
+docker compose -f docker-compose.local.yml up
+```
+
+You will then have three docker containers running:
+
+* frontend: [http://localhost:3000](http://localhost:3000)
+* backend (swagger): [http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)
 * Postgres: localhost:5432
 
 ### 3. Run in production (server already has Traefik + Watchtower)
