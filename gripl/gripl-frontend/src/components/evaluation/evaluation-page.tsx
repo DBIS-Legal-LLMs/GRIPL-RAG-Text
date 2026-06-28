@@ -26,7 +26,6 @@ import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluat
 import MetricChart from "@/components/evaluation/charts/aggregated/metric-chart";
 import {ColorProvider, useColors} from "@/components/evaluation/charts/common/color-context";
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
-import PastRunsPanel from "@/components/evaluation/past-runs-panel";
 
 type ModelReportEnvelope = {
     modelLabel: string;
@@ -144,12 +143,6 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(evaluationRequest)
         });
-        await processNdjsonStream(res);
-    };
-
-    const handleLoadRun = async (runId: number) => {
-        resetState();
-        const res = await fetch(`/api/gdpr/evaluation/runs/${runId}/stream`);
         await processNdjsonStream(res);
     };
 
@@ -468,7 +461,6 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
 
     return (
         <div className="w-full">
-            <PastRunsPanel onLoadRun={handleLoadRun} isLoading={isLoading} />
             <EvaluationConfig onMultiConfigChanged={setEvaluationRequest} datasets={datasets} className="mb-6">
                 <div className="flex flex-row justify-between items-start flex-wrap mb-4 gap-4">
                     <div className="flex flex-row gap-4 flex-wrap">

@@ -4,7 +4,6 @@ import de.mertendieckmann.griplbackend.evaluation.EvaluationRunner
 import de.mertendieckmann.griplbackend.evaluation.MultiEvaluationRunner
 import de.mertendieckmann.griplbackend.repository.DatasetRepository
 import de.mertendieckmann.griplbackend.repository.EvaluationDataRepository
-import de.mertendieckmann.griplbackend.repository.EvaluationRunRepository
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -15,8 +14,7 @@ class MultiEvaluationRunnerSeedTest {
     private val runner = MultiEvaluationRunner(
         singleRunner = mock(EvaluationRunner::class.java),
         datasetRepository = mock(DatasetRepository::class.java),
-        evaluationDataRepository = mock(EvaluationDataRepository::class.java),
-        evaluationRunRepository = mock(EvaluationRunRepository::class.java)
+        evaluationDataRepository = mock(EvaluationDataRepository::class.java)
     )
 
     private val deriveRunSeedMethod: Method =
