@@ -18,6 +18,8 @@ import {GenerateRandomInput} from "@/components/ui/input-generate-random";
 import {safeFloatOrNull} from "@/lib/evaluation-config-utils";
 import {Switch} from "@/components/ui/switch";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {useToast} from "@/components/ui/toast";
+import {extractErrorDetails, toErrorMessage} from "@/lib/http-error";
 
 interface AnalysisToolCardProps {
     bpmnXml: string;
@@ -36,6 +38,8 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
     const [useRag, setUseRag] = useState<boolean>(false)
     const [searchMode, setSearchMode] = useState<string>("hybrid")
     const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
+
+    const {showError} = useToast()
 
     function handleAnalyzeClick() {
         setAnalysisResult(null);
@@ -66,19 +70,20 @@ export default function AnalysisToolCard({ bpmnXml, analysisResult, setAnalysisR
                 Accept: "application/json"
             },
             body: formData
-        } as RequestInit).then(response => {
+        } as RequestInit).then(async response => {
             if (!response.ok) {
-                throw new Error("Fehler bei der Analyse des Diagramms");
+                const details = await extractErrorDetails(response);
+                throw new Error(details);
             }
             return response.json();
         }).then((data: AnalysisResponse) => {
-            console.log("Analyse abgeschlossen:", data);
+            console.log("Analysis complete:", data);
             setIsAnalyzing(false);
             setAnalysisResult(data);
         }).catch(error => {
-            console.error("Fehler bei der Analyse:", error);
+            console.error("Error during analysis:", error);
             setIsAnalyzing(false);
-            alert("Fehler bei der Analyse des Diagramms: " + error.message);
+            showError("Failed to analyze the diagram", toErrorMessage(error));
         })
     }
 

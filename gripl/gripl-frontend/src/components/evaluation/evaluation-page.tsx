@@ -26,6 +26,8 @@ import {AggregatedEvaluationResults} from "@/models/evaluation/AggregatedEvaluat
 import MetricChart from "@/components/evaluation/charts/aggregated/metric-chart";
 import {ColorProvider, useColors} from "@/components/evaluation/charts/common/color-context";
 import MetricsTable from "@/components/evaluation/charts/aggregated/metrics-table";
+import {useToast} from "@/components/ui/toast";
+import {toErrorMessage} from "@/lib/http-error";
 
 type ModelReportEnvelope = {
     modelLabel: string;
@@ -55,6 +57,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const [isMetricsSummaryOpen, setIsMetricsSummaryOpen] = useState<boolean>(false);
 
     const { colors, setColors } = useColors()
+    const { showToast, showError } = useToast()
 
     const processNdjsonStream = async (res: Response) => {
         if (!res.ok || !res.body) {
@@ -291,7 +294,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const handleDownloadMarkdownReport = () => {
         const hasSummaries = summaryByRun.size > 0;
         if (testCasesByRun.size === 0 && !hasSummaries) {
-            alert("No results yet.");
+            showToast({title: "No results yet", description: "Run an evaluation before downloading a report.", variant: "info"});
             return;
         }
         const sections: string[] = [];
@@ -362,7 +365,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
     const handleDownloadJsonReport = () => {
         const hasSummaries = summaryByRun.size > 0;
         if (testCasesByRun.size === 0 && !hasSummaries) {
-            alert("No results yet.");
+            showToast({title: "No results yet", description: "Run an evaluation before downloading a report.", variant: "info"});
             return;
         }
 
@@ -443,7 +446,7 @@ export default function EvaluationPage({ datasets }: EvaluationPageProps) {
                 }
             } catch (err) {
                 console.error("Failed to load report:", err);
-                alert("Failed to load report: " + (err as Error).message);
+                showError("Failed to load report", toErrorMessage(err));
             }
         };
         reader.readAsText(file);

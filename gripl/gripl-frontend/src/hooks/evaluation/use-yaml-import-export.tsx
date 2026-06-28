@@ -5,6 +5,8 @@ import { dump as yamlDump, load as yamlLoad } from "js-yaml";
 import { MultiEvaluationRequest, ModelRunConfig } from "@/models/dto/MultiEvaluationRequest";
 import {ModelRowState} from "@/models/evaluation/Config";
 import {cryptoRandomId, findPreset, normalize, pruneNulls} from "@/lib/evaluation-config-utils";
+import {useToast} from "@/components/ui/toast";
+import {toErrorMessage} from "@/lib/http-error";
 
 export function useYamlImportExport(props: {
     availableEvaluationEndpoints: AnalysisEndpoint[];
@@ -54,6 +56,7 @@ export function useYamlImportExport(props: {
     } = props;
 
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const {showError} = useToast();
 
     function onClickImportYaml() {
         fileInputRef.current?.click();
@@ -68,7 +71,7 @@ export function useYamlImportExport(props: {
             applyYamlConfig(parsed);
         } catch (err) {
             console.error("YAML parse error:", err);
-            alert("Failed to parse YAML. Please check the file.");
+            showError("Failed to parse YAML", toErrorMessage(err));
         } finally {
             e.target.value = "";
         }
