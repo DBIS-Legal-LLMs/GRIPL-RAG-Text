@@ -276,8 +276,14 @@ class PromptBpmnAnalyzer(
     ): String = buildString {
         appendLine("=== RETRIEVED GDPR KNOWLEDGE ===")
         appendLine(
-            "The following unique knowledge was retrieved from a GDPR legal knowledge graph. " +
-            "Use this context when assessing whether each BPMN activity processes personal data."
+            "The following knowledge was retrieved from a GDPR legal knowledge graph as " +
+            "process-wide background. It was gathered across ALL elements of the process and " +
+            "is NOT scoped to any single element. Treat it only as reference material that may " +
+            "help you reason about elements that genuinely process personal data.\n" +
+            "Important: the mere presence of GDPR text below is NOT evidence that any given " +
+            "element is critical. Do not assume an element is critical just because related legal " +
+            "context was retrieved. Judge each element on whether it itself processes personal " +
+            "data."
         )
         appendLine()
 
