@@ -102,14 +102,17 @@ class PromptBpmnAnalyzer(
             bpmnElements
                 .map { element ->
                     async {
-                        if (!element.isActivity) return@async null
+                        // Retrieve GDPR context for every classifiable element (activities,
+                        // events, gateways, data objects/stores) — not just activities. Only
+                        // textAnnotation is excluded, as it is never classified.
+                        if (element.type.equals("textAnnotation", ignoreCase = true)) return@async null
 
                         val queryText = sequenceOf(
                             element.name, element.documentation, element.poolName, element.laneName
                         )
                             .filterNotNull()
                             .filter { it.isNotBlank() }
-                            .filter { it.length > 3 && !it.matches(Regex("""[\d/.\-]+""")) }
+                            .filter { !it.matches(Regex("""[\d/.\-]+""")) }
                             .joinToString(" - ")
 
                         if (queryText.isNotBlank()) {

@@ -126,6 +126,11 @@ export default function Home() {
                           <RagContextCard
                               ragContext={analysisResult.ragContext!}
                               selectedElementId={selectedElementId}
+                              elementNames={Object.fromEntries(
+                                  analysisResult.criticalElements
+                                      .filter(e => e.name)
+                                      .map(e => [e.id, e.name])
+                              )}
                           />
                       </TabsContent>
                   </CardContent>

@@ -13,6 +13,7 @@ const PdfViewerModal = dynamic(() => import("@/components/sandbox/pdf-viewer-mod
 interface RagContextCardProps {
     ragContext: Record<string, RagElementContext>;
     selectedElementId?: string | null;
+    elementNames?: Record<string, string>;
 }
 
 interface ViewerState {
@@ -20,7 +21,7 @@ interface ViewerState {
     exactText: string;
 }
 
-export default function RagContextCard({ ragContext, selectedElementId }: RagContextCardProps) {
+export default function RagContextCard({ ragContext, selectedElementId, elementNames }: RagContextCardProps) {
     const entries = Object.entries(ragContext);
     const [viewerState, setViewerState] = useState<ViewerState | null>(null);
     const [isOpen, setIsOpen] = useState(true);
@@ -85,7 +86,7 @@ export default function RagContextCard({ ragContext, selectedElementId }: RagCon
                                         : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
                                 }`}
                             >
-                                {ctx.activityName || elementId}
+                                {ctx.activityName || elementNames?.[elementId] || elementId}
                                 {total > 0 && (
                                     <span className={`ml-1.5 ${isActive ? "opacity-80" : "opacity-50"}`}>
                                         {total}
