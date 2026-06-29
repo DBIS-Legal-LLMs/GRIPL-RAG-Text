@@ -131,10 +131,14 @@ Always build with `--no-cache` to avoid using stale layers:
 
 ```bash
 docker compose -f docker-compose.local.yml build --no-cache gripl-backend
-docker compose -f docker-compose.local.yml up gripl-backend
+docker compose -f docker-compose.local.yml up gripl-backend gripl-postgres
 ```
 
-The backend is available at [http://localhost:8000](http://localhost:8000).
+To test the backend without the frontend, open:
+- **Swagger UI**: [http://localhost:8000/swagger-ui](http://localhost:8000/swagger-ui)
+- **Health Check**: [http://localhost:8000/actuator/health](http://localhost:8000/actuator/health)
+
+Note: `gripl-postgres` must be included — the backend requires a database connection to start.
 
 ---
 
