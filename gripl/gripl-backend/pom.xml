@@ -47,7 +47,7 @@
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
-			<version>42.7.7</version>
+			<version>42.7.11</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -126,17 +126,17 @@
 		<dependency>
 			<groupId>org.camunda.bpm.springboot</groupId>
 			<artifactId>camunda-bpm-spring-boot-starter</artifactId>
-			<version>7.23.0</version>
+			<version>7.24.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.camunda.bpm.model</groupId>
 			<artifactId>camunda-bpmn-model</artifactId>
-			<version>7.23.0</version>
+			<version>7.24.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.camunda.bpm</groupId>
 			<artifactId>camunda-engine</artifactId>
-			<version>7.23.0</version>
+			<version>7.24.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.microsoft.playwright</groupId>
@@ -146,12 +146,12 @@
 		<dependency>
 			<groupId>info.picocli</groupId>
 			<artifactId>picocli-spring-boot-starter</artifactId>
-			<version>4.7.6</version>
+			<version>4.7.7</version>
 		</dependency>
 		<dependency>
 			<groupId>info.picocli</groupId>
 			<artifactId>picocli-shell-jline3</artifactId>
-			<version>4.7.6</version>
+			<version>4.7.7</version>
 		</dependency>
 	</dependencies>
 
