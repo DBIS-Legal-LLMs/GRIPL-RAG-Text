@@ -2,6 +2,7 @@ package de.mertendieckmann.griplbackend.model.dto
 
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
+import de.mertendieckmann.griplbackend.model.evaluation.ElementTypeCounts
 import java.sql.Timestamp
 
 @JsonTypeInfo(
@@ -67,7 +68,9 @@ data class TestCaseReport(
     val result: List<ExpectedValue>,
     val amountOfRetries: Int? = null,
     val ragMetrics: TestCaseRagMetrics? = null,
-    val ragPromptContext: List<String>? = null
+    val ragPromptContext: List<String>? = null,
+    /** Confusion counts of this test case broken down by element category. */
+    val perElementType: Map<String, ElementTypeCounts> = emptyMap()
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
@@ -125,6 +128,19 @@ data class RagSummaryMetrics(
     val failedSamples: Int = 0
 )
 
+/** Aggregated confusion counts and derived metrics for one element category. */
+data class ElementTypeSummary(
+    val displayName: String,
+    val truePositives: Int,
+    val falsePositives: Int,
+    val falseNegatives: Int,
+    val trueNegatives: Int,
+    val precision: Double,
+    val recall: Double,
+    val f1Score: Double,
+    val accuracy: Double
+)
+
 data class EvaluationReportSummary(
     val total: Int,
     val passed: Int,
@@ -139,10 +155,22 @@ data class EvaluationReportSummary(
     val totalFalsePositives: Int,
     val totalFalseNegatives: Int,
     val totalTrueNegatives: Int,
-    val ragMetrics: RagSummaryMetrics? = null
+    val ragMetrics: RagSummaryMetrics? = null,
+    /** Metrics broken down by element category, keyed by category key (activity, event, ...). */
+    val perElementType: Map<String, ElementTypeSummary> = emptyMap()
 ): EvaluationReport() {
 
     override fun toMarkdown(): String {
+        val perTypeBlock = if (perElementType.isEmpty()) "" else buildString {
+            appendLine()
+            appendLine("### Metrics by Element Type")
+            appendLine("| Type | TP | FP | FN | TN | Precision | Recall | F1 |")
+            appendLine("|------|----|----|----|----|-----------|--------|----|")
+            perElementType.values.forEach { s ->
+                appendLine("| ${s.displayName} | ${s.truePositives} | ${s.falsePositives} | ${s.falseNegatives} | ${s.trueNegatives} | ${"%.3f".format(s.precision)} | ${"%.3f".format(s.recall)} | ${"%.3f".format(s.f1Score)} |")
+            }
+        }
+
         val ragBlock = ragMetrics?.let {
             """
             |
@@ -172,6 +200,7 @@ data class EvaluationReportSummary(
             |False Positives: $totalFalsePositives
             |False Negatives: $totalFalseNegatives
             |True Negatives: $totalTrueNegatives
+            |$perTypeBlock
             |$ragBlock
         """.trimMargin()
     }

@@ -1,3 +1,18 @@
+export interface AggregatedElementTypeResult {
+    displayName: string
+    avgPrecision: number
+    stdPrecision: number
+    avgRecall: number
+    stdRecall: number
+    avgF1Score: number
+    stdF1Score: number
+    avgTruePositives: number
+    avgFalsePositives: number
+    avgFalseNegatives: number
+    avgTrueNegatives: number
+    runsCounted: number
+}
+
 export interface AggregatedEvaluationResult {
     avgPrecision: number
     stdPrecision: number
@@ -28,6 +43,7 @@ export interface AggregatedEvaluationResult {
     avgFaithfulness: number | undefined
     stdFaithfulness: number | undefined
     ragRunsCounted: number
+    perElementType?: Record<string, AggregatedElementTypeResult>
 }
 
 export type AggregatedEvaluationResults = Record<string, AggregatedEvaluationResult>;

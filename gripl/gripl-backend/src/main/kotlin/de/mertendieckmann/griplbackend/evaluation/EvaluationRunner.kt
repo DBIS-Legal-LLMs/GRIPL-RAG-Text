@@ -71,6 +71,10 @@ class EvaluationRunner(
 
         val bpmnModel = parseBpmn(entry.bpmnXml)
 
+        val analysisNamesById = actualResult.analysisResponse.criticalElements
+            .mapNotNull { ce -> ce.name?.let { ce.id to it } }
+            .toMap()
+
         val classification = computeClassificationSets(expectedActivityIds, actualActivityIds)
         val trueNegativesCount = computeTrueNegativesCount(
             bpmnModel = bpmnModel,
@@ -78,6 +82,7 @@ class EvaluationRunner(
             falsePositivesCount = classification.falsePositiveIds.size,
             falseNegativesCount = classification.falseNegativeIds.size
         )
+        val perElementType = computePerElementTypeCounts(bpmnModel, classification)
 
         if (evaluationRequest.evaluateRag && actualResult.analysisResponse.ragContext.isNullOrEmpty()) {
             log.warn { "RAG context missing or empty -> proceeding with evaluation but metrics might be affected for ${entry.id}" }
@@ -100,7 +105,8 @@ class EvaluationRunner(
             trueNegatives = trueNegativesCount,
             isSuccessful = actualActivityIds.toSet() == expectedActivityIds.toSet(),
             amountOfRetries = actualResult.amountOfRetries,
-            ragMetrics = ragMetrics
+            ragMetrics = ragMetrics,
+            perElementType = perElementType
         )
 
         val testCaseReport = TestCaseReport(
@@ -116,11 +122,12 @@ class EvaluationRunner(
             correctActivityIds = classification.truePositiveIds,
             falsePositiveIds = classification.falsePositiveIds,
             falseNegativeIds = classification.falseNegativeIds,
-            expectedNamesWithIds = getNamesWithIds(bpmnModel, expectedActivityIds),
-            actualNamesWithIds = getNamesWithIds(bpmnModel, actualActivityIds),
+            expectedNamesWithIds = getNamesWithIds(bpmnModel, expectedActivityIds, analysisNamesById),
+            actualNamesWithIds = getNamesWithIds(bpmnModel, actualActivityIds, analysisNamesById),
             isSuccessful = metrics.isSuccessful,
             result = actualResult.expectedValues,
             amountOfRetries = actualResult.amountOfRetries,
+            perElementType = perElementType,
             ragMetrics = ragMetrics?.let {
                 TestCaseRagMetrics(
                     faithfulness = it.faithfulness,

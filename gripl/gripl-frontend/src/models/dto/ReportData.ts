@@ -27,6 +27,21 @@ export interface RagSummaryMetrics {
     failedSamples: number;
 }
 
+export interface ElementTypeCounts {
+    truePositives: number;
+    falsePositives: number;
+    falseNegatives: number;
+    trueNegatives: number;
+}
+
+export interface ElementTypeSummary extends ElementTypeCounts {
+    displayName: string;
+    precision: number;
+    recall: number;
+    f1Score: number;
+    accuracy: number;
+}
+
 export interface TestCaseReport {
     type: "testCase";
     testCaseId: number;
@@ -43,6 +58,7 @@ export interface TestCaseReport {
     amountOfRetries: number | null;
     ragMetrics?: TestCaseRagMetrics | null;
     ragPromptContext?: string[] | null;
+    perElementType?: Record<string, ElementTypeCounts>;
     markdown: string;
 }
 
@@ -62,6 +78,7 @@ export interface EvaluationReportSummary {
     totalFalseNegatives: number;
     totalTrueNegatives: number;
     ragMetrics?: RagSummaryMetrics | null;
+    perElementType?: Record<string, ElementTypeSummary>;
     markdown: string;
 }
 

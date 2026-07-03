@@ -1,8 +1,10 @@
 package de.mertendieckmann.griplbackend.application
 
 import de.mertendieckmann.griplbackend.model.BpmnElement
+import de.mertendieckmann.griplbackend.model.BpmnFlowLabel
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.camunda.bpm.model.bpmn.Bpmn
+import org.camunda.bpm.model.bpmn.BpmnModelInstance
 import org.camunda.bpm.model.bpmn.impl.instance.ProcessImpl
 import org.camunda.bpm.model.bpmn.instance.*
 import org.camunda.bpm.model.xml.ModelParseException
@@ -12,6 +14,40 @@ import org.springframework.web.server.ResponseStatusException
 
 class BpmnExtractor {
     private val log = KotlinLogging.logger { }
+
+    /**
+     * The human-readable label of a sequence flow: its name, its condition expression, or both.
+     * Returns null for unlabeled flows so they can be skipped entirely.
+     */
+    private fun sequenceFlowLabel(flow: SequenceFlow): String? {
+        val name = flow.name?.takeIf { it.isNotBlank() }
+        val condition = flow.conditionExpression?.textContent?.takeIf { it.isNotBlank() }
+        return when {
+            name != null && condition != null && !name.equals(condition, ignoreCase = true) -> "$name [condition: $condition]"
+            name != null -> name
+            else -> condition
+        }
+    }
+
+    private fun outgoingFlowLabels(element: FlowNode): List<BpmnFlowLabel> =
+        element.outgoing.mapNotNull { flow ->
+            sequenceFlowLabel(flow)?.let { BpmnFlowLabel(it, flow.target.id) }
+        }
+
+    private fun incomingFlowLabels(element: FlowNode): List<BpmnFlowLabel> =
+        element.incoming.mapNotNull { flow ->
+            sequenceFlowLabel(flow)?.let { BpmnFlowLabel(it, flow.source.id) }
+        }
+
+    private fun outgoingMessageFlowLabels(bpmnModel: BpmnModelInstance, elementId: String): List<BpmnFlowLabel> =
+        bpmnModel.getModelElementsByType(MessageFlow::class.java)
+            .filter { it.source.id == elementId }
+            .mapNotNull { flow -> flow.name?.takeIf { it.isNotBlank() }?.let { BpmnFlowLabel(it, flow.target.id) } }
+
+    private fun incomingMessageFlowLabels(bpmnModel: BpmnModelInstance, elementId: String): List<BpmnFlowLabel> =
+        bpmnModel.getModelElementsByType(MessageFlow::class.java)
+            .filter { it.target.id == elementId }
+            .mapNotNull { flow -> flow.name?.takeIf { it.isNotBlank() }?.let { BpmnFlowLabel(it, flow.source.id) } }
 
     fun extractBpmnElements(bpmnXml: String): Set<BpmnElement> {
 
@@ -43,8 +79,12 @@ class BpmnExtractor {
                         outgoingFlowElementIds = element.outgoing.mapNotNull {
                             bpmnModel.getModelElementById<SequenceFlow>(it.id).getAttributeValue("targetRef")
                         },
+                        outgoingFlowLabels = outgoingFlowLabels(element),
+                        incomingFlowLabels = incomingFlowLabels(element),
                         outgoingMessageFlowsToElementIds = bpmnModel.getModelElementsByType(MessageFlow::class.java).filter { it.source.id == element.id }.map { it.target.id },
                         incomingMessageFlowsFromElementIds = bpmnModel.getModelElementsByType(MessageFlow::class.java).filter { it.target.id == element.id }.map { it.source.id },
+                        outgoingMessageFlowLabels = outgoingMessageFlowLabels(bpmnModel, element.id),
+                        incomingMessageFlowLabels = incomingMessageFlowLabels(bpmnModel, element.id),
                         incomingDataFromElementIds = element.dataInputAssociations.flatMap { it.sources.mapNotNull { source -> source.id } },
                         outgoingDataToElementIds = element.dataOutputAssociations.map { it.target.id },
                         associatedElementIds = bpmnModel.getModelElementsByType(Association::class.java)
@@ -77,8 +117,12 @@ class BpmnExtractor {
                                 it.id
                             ).getAttributeValue("targetRef")
                         },
+                        outgoingFlowLabels = outgoingFlowLabels(element),
+                        incomingFlowLabels = incomingFlowLabels(element),
                         outgoingMessageFlowsToElementIds = bpmnModel.getModelElementsByType(MessageFlow::class.java).filter { it.source.id == element.id }.map { it.target.id },
                         incomingMessageFlowsFromElementIds = bpmnModel.getModelElementsByType(MessageFlow::class.java).filter { it.target.id == element.id }.map { it.source.id },
+                        outgoingMessageFlowLabels = outgoingMessageFlowLabels(bpmnModel, element.id),
+                        incomingMessageFlowLabels = incomingMessageFlowLabels(bpmnModel, element.id),
                         associatedElementIds = bpmnModel.getModelElementsByType(Association::class.java)
                             .filter { it.getAttributeValue("sourceRef") == element.id }
                             .mapNotNull { it.getAttributeValue("targetRef") }

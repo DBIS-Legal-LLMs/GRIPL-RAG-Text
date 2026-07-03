@@ -30,9 +30,12 @@ data class AnalysisResponse(
                 val bpmnElement = bpmnElements.find { it.id == element.id }
                 CriticalElement(
                     id = element.id,
-                    // Prefer the element's real BPMN name; fall back to the label the
-                    // LLM generated from surrounding context for unnamed elements.
-                    name = bpmnElement?.name?.takeIf { it.isNotBlank() } ?: element.label,
+                    // Prefer the element's real BPMN name, then the deterministic name
+                    // derived from its labeled flows; the LLM-generated label is the last
+                    // resort for unnamed elements without any labeled flows.
+                    name = bpmnElement?.name?.takeIf { it.isNotBlank() }
+                        ?: bpmnElement?.derivedNameFromFlows()
+                        ?: element.label,
                     type = bpmnElement?.type,
                     reason = element.reason,
                     references = element.references.map { ref ->

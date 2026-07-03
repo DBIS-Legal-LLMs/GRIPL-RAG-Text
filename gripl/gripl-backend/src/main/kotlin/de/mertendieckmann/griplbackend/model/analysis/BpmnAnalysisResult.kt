@@ -16,7 +16,7 @@ data class BpmnAnalysisResult(
     data class Element(
         @Description("The ID of the BPMN Element")
         val id: String,
-        @Description("A short human-readable label (max ~8 words) ONLY for elements that have no name (typically gateways and some events), generated from the element's type and surrounding context, e.g. \"Gateway: patient is a minor?\" or \"Message event: send record to insurer\". Leave null for elements that already have a name – their name is already known and must not be repeated here.")
+        @Description("A short human-readable label (max ~8 words) ONLY for elements that have neither a name nor any labeled flows, generated from the element's type and surrounding context, e.g. \"Gateway: patient is a minor?\" or \"Message event: send record to insurer\". Leave null for elements that have a name or labeled flows – their display name is already known or derived from the flow labels.")
         val label: String? = null,
         @Description("The detailed reason why the BPMN Element is relevant for GDPR compliance and why you think personal data is processed, transmitted, stored or used in a decision.")
         val reason: String,

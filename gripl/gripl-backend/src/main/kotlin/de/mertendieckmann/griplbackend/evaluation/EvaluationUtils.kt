@@ -3,11 +3,19 @@ package de.mertendieckmann.griplbackend.evaluation
 import de.mertendieckmann.griplbackend.model.dto.EvaluationData
 import de.mertendieckmann.griplbackend.model.dto.EvaluationReportStepInfo
 import de.mertendieckmann.griplbackend.model.evaluation.ClassificationSets
+import de.mertendieckmann.griplbackend.model.evaluation.ElementTypeCounts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.camunda.bpm.model.bpmn.Bpmn
 import org.camunda.bpm.model.bpmn.BpmnModelInstance
 import org.camunda.bpm.model.bpmn.instance.Activity
+import org.camunda.bpm.model.bpmn.instance.BaseElement
+import org.camunda.bpm.model.bpmn.instance.DataObjectReference
+import org.camunda.bpm.model.bpmn.instance.DataStoreReference
+import org.camunda.bpm.model.bpmn.instance.Event
+import org.camunda.bpm.model.bpmn.instance.FlowElement
+import org.camunda.bpm.model.bpmn.instance.FlowNode
+import org.camunda.bpm.model.bpmn.instance.Gateway
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import kotlin.math.floor
@@ -33,16 +41,105 @@ fun computeTrueNegativesCount(
     falsePositivesCount: Int,
     falseNegativesCount: Int
 ): Int {
-    val totalActivities = bpmnModel.getModelElementsByType(Activity::class.java).size
-    return (totalActivities - truePositivesCount - falsePositivesCount - falseNegativesCount)
+    val totalClassifiableElements = classifiableElementIds(bpmnModel).size
+    return (totalClassifiableElements - truePositivesCount - falsePositivesCount - falseNegativesCount)
         .coerceAtLeast(0)
 }
 
-fun getNamesWithIds(model: BpmnModelInstance, ids: List<String>): List<String> =
-    ids.mapNotNull { id ->
-        val name = model.getModelElementById<Activity>(id)?.name ?: return@mapNotNull null
+/**
+ * IDs of all BPMN elements that the classifier can label as GDPR-relevant:
+ * flow nodes (activities, events, gateways) plus data object/store references.
+ * Mirrors the element types extracted by BpmnExtractor (text annotations excluded),
+ * so the true-negative universe matches what is actually classified.
+ */
+private fun classifiableElementIds(bpmnModel: BpmnModelInstance): Set<String> =
+    classifiableElements(bpmnModel).map { it.id }.toSet()
+
+private fun classifiableElements(bpmnModel: BpmnModelInstance): List<BaseElement> =
+    (bpmnModel.getModelElementsByType(FlowNode::class.java) +
+        bpmnModel.getModelElementsByType(DataObjectReference::class.java) +
+        bpmnModel.getModelElementsByType(DataStoreReference::class.java))
+        .distinctBy { it.id }
+
+/**
+ * The element categories metrics are broken down by. The [key] is the stable identifier
+ * used in report JSON; [displayName] is what reports and the UI show.
+ */
+enum class ElementCategory(val key: String, val displayName: String) {
+    ACTIVITY("activity", "Activities"),
+    EVENT("event", "Events"),
+    GATEWAY("gateway", "Gateways"),
+    DATA_OBJECT("dataObject", "Data Objects/Stores"),
+    OTHER("other", "Other")
+}
+
+private fun categorize(element: BaseElement): ElementCategory = when (element) {
+    is Activity -> ElementCategory.ACTIVITY
+    is Gateway -> ElementCategory.GATEWAY
+    is Event -> ElementCategory.EVENT
+    is DataObjectReference, is DataStoreReference -> ElementCategory.DATA_OBJECT
+    else -> ElementCategory.OTHER
+}
+
+/**
+ * Breaks the confusion counts of one test case down by element category
+ * (activities, events, gateways, data objects/stores), keyed by [ElementCategory.key].
+ * True negatives per category are derived from the number of classifiable elements of that
+ * category in the diagram. Ids that don't resolve to a classifiable element (e.g. stale
+ * ground-truth labels) land in the "other" bucket instead of being silently dropped.
+ */
+fun computePerElementTypeCounts(
+    bpmnModel: BpmnModelInstance,
+    classification: ClassificationSets
+): Map<String, ElementTypeCounts> {
+    val categoryById = classifiableElements(bpmnModel).associate { it.id to categorize(it) }
+
+    fun byCategory(ids: List<String>): Map<ElementCategory, Int> =
+        ids.groupingBy { categoryById[it] ?: ElementCategory.OTHER }.eachCount()
+
+    val tp = byCategory(classification.truePositiveIds)
+    val fp = byCategory(classification.falsePositiveIds)
+    val fn = byCategory(classification.falseNegativeIds)
+    val totals = categoryById.values.groupingBy { it }.eachCount()
+
+    return (tp.keys + fp.keys + fn.keys + totals.keys).sortedBy { it.ordinal }.associate { category ->
+        val tpCount = tp[category] ?: 0
+        val fpCount = fp[category] ?: 0
+        val fnCount = fn[category] ?: 0
+        val tnCount = ((totals[category] ?: 0) - tpCount - fpCount - fnCount).coerceAtLeast(0)
+        category.key to ElementTypeCounts(tpCount, fpCount, fnCount, tnCount)
+    }
+}
+
+/**
+ * Builds "<name> (<id>)" display strings for the given element ids. Elements are never
+ * dropped: the display name falls back from the real BPMN name, to a caller-supplied label
+ * (the analysis-resolved name for detected elements), to a name derived from the element's
+ * labeled outgoing flows (unnamed gateways), to the raw id.
+ */
+fun getNamesWithIds(
+    model: BpmnModelInstance,
+    ids: List<String>,
+    labelOverrides: Map<String, String> = emptyMap()
+): List<String> =
+    ids.map { id ->
+        val name = model.getModelElementById<FlowElement>(id)?.name?.takeIf { it.isNotBlank() }
+            ?: labelOverrides[id]?.takeIf { it.isNotBlank() }
+            ?: derivedGatewayName(model, id)
+            ?: id
         "$name ($id)"
     }
+
+/**
+ * Derives a display name for an unnamed gateway from its labeled outgoing sequence flows,
+ * mirroring BpmnElement.derivedNameFromFlows so expected-but-undetected gateways are shown
+ * the same way as detected ones.
+ */
+private fun derivedGatewayName(model: BpmnModelInstance, id: String): String? {
+    val gateway = model.getModelElementById<FlowElement>(id) as? Gateway ?: return null
+    val labels = gateway.outgoing.mapNotNull { flow -> flow.name?.takeIf { it.isNotBlank() } }
+    return labels.takeIf { it.isNotEmpty() }?.joinToString(" / ", prefix = "Gateway: ")
+}
 
 fun buildPreviewUrl(
     testCaseId: Long,

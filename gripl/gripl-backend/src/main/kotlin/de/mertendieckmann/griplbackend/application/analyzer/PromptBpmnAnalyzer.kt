@@ -107,8 +107,15 @@ class PromptBpmnAnalyzer(
                         // textAnnotation is excluded, as it is never classified.
                         if (element.type.equals("textAnnotation", ignoreCase = true)) return@async null
 
+                        val flowLabelText = (element.outgoingFlowLabels + element.incomingFlowLabels +
+                                element.outgoingMessageFlowLabels + element.incomingMessageFlowLabels)
+                            .map { it.label }
+                            .filterNot { it.matches(Regex("""(?i)\s*(yes|no|ja|nein|ok|true|false)\s*""")) }
+                            .distinct()
+                            .joinToString(" - ")
+
                         val queryText = sequenceOf(
-                            element.name, element.documentation, element.poolName, element.laneName
+                            element.name, element.documentation, flowLabelText, element.poolName, element.laneName
                         )
                             .filterNotNull()
                             .filter { it.isNotBlank() }
