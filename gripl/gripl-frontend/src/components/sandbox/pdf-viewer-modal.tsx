@@ -7,6 +7,8 @@ import "react-pdf/dist/Page/TextLayer.css";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import { extractErrorDetails, toErrorMessage } from "@/lib/http-error";
 import { PdfLocateResponse } from "@/models/dto/AnalysisDto";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -14,7 +16,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
     import.meta.url
 ).toString();
 
-const RAG_BASE = "/rag";
+// Direct base URL for standalone dev (CORS is open on the RAG service);
+// falls back to the /rag proxy path used behind Traefik / the Next.js rewrite.
+const RAG_BASE = process.env.NEXT_PUBLIC_RAG_BASE_URL || "/rag";
 
 interface PdfViewerModalProps {
     open: boolean;
@@ -28,6 +32,7 @@ export default function PdfViewerModal({ open, onClose, documentName, exactText 
     const [currentPage, setCurrentPage] = useState<number>(1);
     const [locateResult, setLocateResult] = useState<PdfLocateResponse | null>(null);
     const [pageWidth, setPageWidth] = useState<number>(600);
+    const { showError } = useToast();
 
     const pdfUrl = `${RAG_BASE}/api/pdf/${encodeURIComponent(documentName)}`;
 
@@ -36,36 +41,21 @@ export default function PdfViewerModal({ open, onClose, documentName, exactText 
         setLocateResult(null);
         setCurrentPage(1);
 
-        console.log("[PdfViewerModal] locate effect", {
-            documentName,
-            exactTextLength: exactText?.length ?? 0,
-            exactTextPreview: exactText?.slice(0, 80),
-        });
+        if (!exactText || exactText.length < 10) return;
 
-        if (!exactText || exactText.length < 10) {
-            console.warn("[PdfViewerModal] exactText is empty or too short — skipping locate request");
-            return;
-        }
-
-        const url = `${RAG_BASE}/api/pdf/${encodeURIComponent(documentName)}/locate`;
-        console.log("[PdfViewerModal] POST", url);
-
-        fetch(url, {
+        fetch(`${RAG_BASE}/api/pdf/${encodeURIComponent(documentName)}/locate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ text: exactText }),
         })
             .then(async (res) => {
-                console.log("[PdfViewerModal] locate response", res.status, res.statusText);
                 if (!res.ok) {
-                    const body = await res.text().catch(() => "");
-                    console.error("[PdfViewerModal] locate failed:", res.status, body);
+                    showError("Could not locate excerpt in PDF", await extractErrorDetails(res));
                     return null;
                 }
                 return res.json();
             })
             .then((data: PdfLocateResponse | null) => {
-                console.log("[PdfViewerModal] locate data", data);
                 if (data) {
                     setLocateResult(data);
                     if (data.page !== null) {
@@ -74,7 +64,7 @@ export default function PdfViewerModal({ open, onClose, documentName, exactText 
                 }
             })
             .catch((err) => {
-                console.error("[PdfViewerModal] locate fetch threw:", err);
+                showError("Could not locate excerpt in PDF", toErrorMessage(err));
             });
     }, [open, documentName, exactText]);
 

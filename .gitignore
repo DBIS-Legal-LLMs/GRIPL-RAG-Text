@@ -9,8 +9,6 @@
 !.env.local.example
 !.env.prod.example
 
-get-docker.sh
-
 # Python
 __pycache__/
 *.pyc
@@ -23,9 +21,3 @@ __pycache__/
 rag_working_dir/
 gripl/gripl-rag/.env
 
-# Personal notes
-RUNNING.md
-.claude/settings.local.json
-check_datasets.py
-import_all_data.py
-import_evaluation_data.py

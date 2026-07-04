@@ -59,22 +59,26 @@ class MetricsAccumulator {
         errors++
     }
 
+    private data class DerivedMetrics(
+        val precision: Double,
+        val recall: Double,
+        val f1Score: Double,
+        val accuracy: Double
+    )
+
+    private fun deriveMetrics(tp: Int, fp: Int, fn: Int, tn: Int): DerivedMetrics {
+        val precision = if (tp + fp > 0) tp.toDouble() / (tp + fp) else 0.0
+        val recall = if (tp + fn > 0) tp.toDouble() / (tp + fn) else 0.0
+        val f1Score = if (precision + recall > 0) 2 * (precision * recall) / (precision + recall) else 0.0
+        val totalCount = tp + fp + fn + tn
+        val accuracy = if (totalCount > 0) (tp + tn).toDouble() / totalCount else 0.0
+        return DerivedMetrics(precision, recall, f1Score, accuracy)
+    }
+
     fun toSummary(): EvaluationReportSummary {
-        val precision = if (totalTruePositives + totalFalsePositives > 0)
-            totalTruePositives.toDouble() / (totalTruePositives + totalFalsePositives)
-        else 0.0
-
-        val recall = if (totalTruePositives + totalFalseNegatives > 0)
-            totalTruePositives.toDouble() / (totalTruePositives + totalFalseNegatives)
-        else 0.0
-
-        val f1Score = if (precision + recall > 0)
-            2 * (precision * recall) / (precision + recall)
-        else 0.0
-
-        val accuracy = if (totalTruePositives + totalFalsePositives + totalFalseNegatives + totalTrueNegatives > 0)
-            (totalTruePositives + totalTrueNegatives).toDouble() / (totalTruePositives + totalFalsePositives + totalFalseNegatives + totalTrueNegatives)
-        else 0.0
+        val overall = deriveMetrics(
+            totalTruePositives, totalFalsePositives, totalFalseNegatives, totalTrueNegatives
+        )
 
         // Per-category metrics in stable display order (activities, events, gateways, data, other).
         // The "other" bucket is dropped when empty — it only carries unresolvable ids.
@@ -85,23 +89,17 @@ class MetricsAccumulator {
                     (c.truePositives + c.falsePositives + c.falseNegatives) > 0
             }
             .associate { (key, c) ->
-                val p = if (c.truePositives + c.falsePositives > 0)
-                    c.truePositives.toDouble() / (c.truePositives + c.falsePositives) else 0.0
-                val r = if (c.truePositives + c.falseNegatives > 0)
-                    c.truePositives.toDouble() / (c.truePositives + c.falseNegatives) else 0.0
-                val f1 = if (p + r > 0) 2 * (p * r) / (p + r) else 0.0
-                val total = c.truePositives + c.falsePositives + c.falseNegatives + c.trueNegatives
-                val acc = if (total > 0) (c.truePositives + c.trueNegatives).toDouble() / total else 0.0
+                val derived = deriveMetrics(c.truePositives, c.falsePositives, c.falseNegatives, c.trueNegatives)
                 key to ElementTypeSummary(
                     displayName = ElementCategory.entries.firstOrNull { it.key == key }?.displayName ?: key,
                     truePositives = c.truePositives,
                     falsePositives = c.falsePositives,
                     falseNegatives = c.falseNegatives,
                     trueNegatives = c.trueNegatives,
-                    precision = p,
-                    recall = r,
-                    f1Score = f1,
-                    accuracy = acc
+                    precision = derived.precision,
+                    recall = derived.recall,
+                    f1Score = derived.f1Score,
+                    accuracy = derived.accuracy
                 )
             }
 
@@ -121,10 +119,10 @@ class MetricsAccumulator {
             failed = (total - passed - errors).coerceAtLeast(0),
             error = errors,
             amountOfRetries = amountOfRetries,
-            precision = precision,
-            recall = recall,
-            f1Score = f1Score,
-            accuracy = accuracy,
+            precision = overall.precision,
+            recall = overall.recall,
+            f1Score = overall.f1Score,
+            accuracy = overall.accuracy,
             totalTruePositives = totalTruePositives,
             totalFalsePositives = totalFalsePositives,
             totalFalseNegatives = totalFalseNegatives,

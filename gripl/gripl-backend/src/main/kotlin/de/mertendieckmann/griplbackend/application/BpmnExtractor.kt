@@ -50,9 +50,13 @@ class BpmnExtractor {
             .mapNotNull { flow -> flow.name?.takeIf { it.isNotBlank() }?.let { BpmnFlowLabel(it, flow.source.id) } }
 
     fun extractBpmnElements(bpmnXml: String): Set<BpmnElement> {
-
         val bpmnModel = Bpmn.readModelFromStream(bpmnXml.byteInputStream())
         Bpmn.validateModel(bpmnModel)
+        return extractBpmnElements(bpmnModel)
+    }
+
+    /** Overload for callers that already hold a parsed model — avoids re-parsing the XML. */
+    fun extractBpmnElements(bpmnModel: BpmnModelInstance): Set<BpmnElement> {
 
         val unsupportedElements = mutableSetOf<String>()
 

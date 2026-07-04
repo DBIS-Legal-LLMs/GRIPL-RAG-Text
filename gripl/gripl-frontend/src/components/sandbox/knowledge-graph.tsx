@@ -89,34 +89,44 @@ export default function KnowledgeGraph({ entities, relationships, onNodeClick }:
     }, []);
 
     const graphData = useMemo(() => {
+        // The RAG parser deduplicates entities case-insensitively but forwards
+        // relationship endpoint labels with their original casing, so all label
+        // matching here must be case-insensitive too or edges silently vanish.
+        const norm = (label: string) => label.toLowerCase();
+
         // Count how many relationships touch each entity label
         const connectionCount: Record<string, number> = {};
         for (const rel of relationships) {
-            connectionCount[rel.source] = (connectionCount[rel.source] ?? 0) + 1;
-            connectionCount[rel.target] = (connectionCount[rel.target] ?? 0) + 1;
+            connectionCount[norm(rel.source)] = (connectionCount[norm(rel.source)] ?? 0) + 1;
+            connectionCount[norm(rel.target)] = (connectionCount[norm(rel.target)] ?? 0) + 1;
         }
 
         // Deduplicate entities by label
         const seen = new Set<string>();
         const nodes: GraphNode[] = [];
         for (const e of entities) {
-            if (!seen.has(e.label)) {
-                seen.add(e.label);
+            if (!seen.has(norm(e.label))) {
+                seen.add(norm(e.label));
                 nodes.push({
                     id: e.label,
                     label: e.label,
                     type: e.type,
                     description: e.description,
-                    connectionCount: connectionCount[e.label] ?? 0,
+                    connectionCount: connectionCount[norm(e.label)] ?? 0,
                 });
             }
         }
 
-        // Only include links where both endpoints exist as nodes
-        const nodeIds = new Set(nodes.map((n) => n.id));
-        const links: GraphLink[] = relationships
-            .filter((r) => nodeIds.has(r.source) && nodeIds.has(r.target))
-            .map((r) => ({ source: r.source, target: r.target, label: r.label }));
+        // Only include links where both endpoints resolve to a node
+        const nodeIdByNormLabel = new Map(nodes.map((n) => [norm(n.id), n.id]));
+        const links: GraphLink[] = [];
+        for (const r of relationships) {
+            const source = nodeIdByNormLabel.get(norm(r.source));
+            const target = nodeIdByNormLabel.get(norm(r.target));
+            if (source && target) {
+                links.push({ source, target, label: r.label });
+            }
+        }
 
         return { nodes, links };
     }, [entities, relationships]);

@@ -56,20 +56,7 @@ class RagasEvaluationService(
             return null
         }
 
-        samples.forEachIndexed { idx, s ->
-            log.info {
-                buildString {
-                    appendLine("=== RAGAS SAMPLE AUDIT [${idx + 1}/${samples.size}] ===")
-                    appendLine("id: ${s.id}")
-                    appendLine("query: ${s.query}")
-                    appendLine("response (FULL):")
-                    appendLine(s.response)
-                    appendLine("contexts (${s.contexts.size}, FULL):")
-                    s.contexts.forEachIndexed { i, c -> appendLine("  [$i] $c") }
-                    appendLine("=== END RAGAS SAMPLE AUDIT [${idx + 1}/${samples.size}] ===")
-                }
-            }
-        }
+        log.debug { "Scoring ${samples.size} Ragas sample(s) against ${promptContexts.size} prompt context(s)" }
 
         return try {
             val response = ragasApiClient.evaluate(

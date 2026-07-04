@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,11 @@ export default function EvaluationConfigDatasetSettings({
     const [testCasesByDataset, setTestCasesByDataset] = useState<Record<number, EvaluationDataMeta[]>>({});
     const [loadingDatasets, setLoadingDatasets] = useState<Record<number, boolean>>({});
     const [expandedDatasetId, setExpandedDatasetId] = useState<number | null>(null);
+    const selectedDatasetsRef = useRef(selectedDatasets);
+    selectedDatasetsRef.current = selectedDatasets;
+    const selectedTestCaseIdsRef = useRef(selectedTestCaseIds);
+    selectedTestCaseIdsRef.current = selectedTestCaseIds;
 
-    // Fetch test cases for any selected dataset we haven't loaded yet.
     useEffect(() => {
         const missing = selectedDatasets.filter(
             (id) => testCasesByDataset[id] === undefined && !loadingDatasets[id]
@@ -44,10 +47,14 @@ export default function EvaluationConfigDatasetSettings({
             getTestcasesByDataset(datasetId).then((tcs) => {
                 setTestCasesByDataset((prev) => ({ ...prev, [datasetId]: tcs }));
                 setLoadingDatasets((prev) => ({ ...prev, [datasetId]: false }));
+                // Skip the auto-select if the dataset was deselected mid-load.
+                if (!selectedDatasetsRef.current.includes(datasetId)) return;
                 // Default: newly loaded dataset's test cases are all selected.
-                onTestCasesChange(
-                    Array.from(new Set([...selectedTestCaseIds, ...tcs.map((tc) => tc.id)]))
+                const merged = Array.from(
+                    new Set([...selectedTestCaseIdsRef.current, ...tcs.map((tc) => tc.id)])
                 );
+                selectedTestCaseIdsRef.current = merged;
+                onTestCasesChange(merged);
             });
         });
     }, [selectedDatasets]);

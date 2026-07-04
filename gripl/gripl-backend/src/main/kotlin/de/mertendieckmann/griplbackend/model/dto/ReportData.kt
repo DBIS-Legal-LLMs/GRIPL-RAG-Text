@@ -3,6 +3,7 @@ package de.mertendieckmann.griplbackend.model.dto
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import de.mertendieckmann.griplbackend.model.evaluation.ElementTypeCounts
+import de.mertendieckmann.griplbackend.model.evaluation.RagMetrics
 import java.sql.Timestamp
 
 @JsonTypeInfo(
@@ -67,7 +68,7 @@ data class TestCaseReport(
     val isSuccessful: Boolean,
     val result: List<ExpectedValue>,
     val amountOfRetries: Int? = null,
-    val ragMetrics: TestCaseRagMetrics? = null,
+    val ragMetrics: RagMetrics? = null,
     val ragPromptContext: List<String>? = null,
     /** Confusion counts of this test case broken down by element category. */
     val perElementType: Map<String, ElementTypeCounts> = emptyMap()
@@ -111,14 +112,6 @@ data class TestCaseReport(
         """.trimMargin()
     }
 }
-
-data class TestCaseRagMetrics(
-    val faithfulness: Double? = null,
-    val contextUtilization: Double? = null,
-    val sampleCount: Int = 0,
-    val failedCount: Int = 0
-)
-
 
 data class RagSummaryMetrics(
     val faithfulnessMean: Double? = null,

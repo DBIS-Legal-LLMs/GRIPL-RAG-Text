@@ -114,8 +114,8 @@ fun computePerElementTypeCounts(
 /**
  * Builds "<name> (<id>)" display strings for the given element ids. Elements are never
  * dropped: the display name falls back from the real BPMN name, to a caller-supplied label
- * (the analysis-resolved name for detected elements), to a name derived from the element's
- * labeled outgoing flows (unnamed gateways), to the raw id.
+ * (the analysis-resolved name, or a name derived via BpmnElement.derivedNameFromFlows for
+ * unnamed gateways/events), to the raw id.
  */
 fun getNamesWithIds(
     model: BpmnModelInstance,
@@ -125,21 +125,9 @@ fun getNamesWithIds(
     ids.map { id ->
         val name = model.getModelElementById<FlowElement>(id)?.name?.takeIf { it.isNotBlank() }
             ?: labelOverrides[id]?.takeIf { it.isNotBlank() }
-            ?: derivedGatewayName(model, id)
             ?: id
         "$name ($id)"
     }
-
-/**
- * Derives a display name for an unnamed gateway from its labeled outgoing sequence flows,
- * mirroring BpmnElement.derivedNameFromFlows so expected-but-undetected gateways are shown
- * the same way as detected ones.
- */
-private fun derivedGatewayName(model: BpmnModelInstance, id: String): String? {
-    val gateway = model.getModelElementById<FlowElement>(id) as? Gateway ?: return null
-    val labels = gateway.outgoing.mapNotNull { flow -> flow.name?.takeIf { it.isNotBlank() } }
-    return labels.takeIf { it.isNotEmpty() }?.joinToString(" / ", prefix = "Gateway: ")
-}
 
 fun buildPreviewUrl(
     testCaseId: Long,

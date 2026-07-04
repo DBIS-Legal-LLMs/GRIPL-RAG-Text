@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     # --- Data Paths ---
     extracted_data_dir: str = "./data/extracted"
+    pdf_data_dir: str = "./data"
 
     class Config:
         env_file = ".env"

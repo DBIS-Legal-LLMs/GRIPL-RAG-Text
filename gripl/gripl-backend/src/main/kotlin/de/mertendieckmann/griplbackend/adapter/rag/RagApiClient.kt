@@ -17,7 +17,9 @@ class RagApiClient(
     private val log = KotlinLogging.logger {}
 
     private val webClient: WebClient = webClientBuilder
-        .baseUrl(ragApiProperties.url)
+        .baseUrl(ragApiProperties.baseUrl)
+        // Hybrid-mode responses carry full document chunks and can exceed the 256 KB default.
+        .codecs { it.defaultCodecs().maxInMemorySize(32 * 1024 * 1024) }
         .build()
 
     /**
@@ -28,6 +30,7 @@ class RagApiClient(
 
         return try {
             webClient.post()
+                .uri("/api/query")
                 .bodyValue(RagRequest(query = queryText, mode = ragMode))
                 .retrieve()
                 .bodyToMono(RagResponseWrapper::class.java)

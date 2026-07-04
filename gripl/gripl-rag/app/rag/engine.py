@@ -24,7 +24,9 @@ async def _retry_on_rate_limit(coro_factory, label: str = "API call"):
             is_rate_limit = (
                 status == 429
                 or "429" in err_msg
-                or "rate" in err_msg
+                or "rate limit" in err_msg
+                or "rate_limit" in err_msg
+                or "ratelimit" in err_msg
                 or "too many requests" in err_msg
                 or status in (502, 503, 529)
             )
@@ -136,22 +138,23 @@ def _get_embedding_func():
         # don't support for all models, causing response.data = None.
         from openai import AsyncOpenAI
 
+        # One client for all embedding batches — avoids a new TCP/TLS
+        # handshake per call. Safe here because LightRAG always invokes the
+        # embedding func from the same (FastAPI) event loop.
+        embed_client = AsyncOpenAI(
+            api_key=settings.embedding_api_key or os.environ.get("OPENAI_API_KEY", ""),
+            base_url=settings.embedding_api_base or None,
+        )
+
         async def _openai_embed_wrapper(texts: list[str]) -> "np.ndarray":
             import numpy as np
 
             async def _do_embed():
-                client = AsyncOpenAI(
-                    api_key=settings.embedding_api_key or os.environ.get("OPENAI_API_KEY", ""),
-                    base_url=settings.embedding_api_base or None,
+                response = await embed_client.embeddings.create(
+                    model=settings.embedding_model,
+                    input=texts,
+                    encoding_format="float",
                 )
-                try:
-                    response = await client.embeddings.create(
-                        model=settings.embedding_model,
-                        input=texts,
-                        encoding_format="float",
-                    )
-                finally:
-                    await client.close()
                 return np.array(
                     [np.array(dp.embedding, dtype=np.float32) for dp in response.data]
                 )

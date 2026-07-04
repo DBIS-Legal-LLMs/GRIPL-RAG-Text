@@ -12,7 +12,7 @@ interface AnalysisResultCardProps {
 // Turns a raw BPMN type name (e.g. "exclusiveGateway") into a readable label
 // ("Exclusive Gateway"). Last-resort fallback when an element has neither a
 // real name nor an LLM-generated contextual label.
-function humanizeType(type?: string): string {
+export function humanizeType(type?: string): string {
     if (!type) return "Unnamed element"
     const spaced = type.replace(/([a-z])([A-Z])/g, "$1 $2")
     return spaced.charAt(0).toUpperCase() + spaced.slice(1)

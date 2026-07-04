@@ -2,12 +2,12 @@
 
 import dynamic from "next/dynamic";
 import BpmnEditor from "@/components/bpmn-editor";
-import {useState} from "react";
+import {useMemo, useState} from "react";
 import {BpmnToolCard} from "@/models/BpmnToolCard";
 import AnalysisToolCard from "@/components/sandbox/analysis-tool-card";
 import emptyDiagram from "@/data/empty-diagram.bpmn";
 import {AnalysisResponse} from "@/models/dto/AnalysisDto";
-import AnalysisResultCard from "@/components/sandbox/analysis-result-card";
+import AnalysisResultCard, {humanizeType} from "@/components/sandbox/analysis-result-card";
 import RagContextCard from "@/components/sandbox/rag-context-card";
 import {BpmnEditorEvent} from "@/models/BpmnEditorEvent";
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
@@ -40,6 +40,18 @@ export default function Home() {
   }
 
   const hasRagContext = analysisResult?.ragContext && Object.keys(analysisResult.ragContext).length > 0;
+
+  // Stable reference so RagContextCard (and the knowledge graph below it)
+  // doesn't receive a fresh object on every render of this page.
+  const elementNames = useMemo(
+      () =>
+          Object.fromEntries(
+              (analysisResult?.criticalElements ?? [])
+                  .filter(e => e.name)
+                  .map(e => [e.id, e.name])
+          ),
+      [analysisResult]
+  );
 
   const bottomPanel = analysisResult ? (
       hasRagContext ? (
@@ -86,7 +98,9 @@ export default function Home() {
                                   const isSelected = element.id === selectedElementId
                                   const hasRefs = element.references && element.references.length > 0
                                   return <tr key={index} className={`border-t align-top ${isSelected ? "bg-destructive/50" : ""}`}>
-                                      <td className="font-medium text-sm p-2 whitespace-nowrap">{element.name}</td>
+                                      <td className="font-medium text-sm p-2 whitespace-nowrap">
+                                          {element.name || <span className="italic text-muted-foreground">{humanizeType(element.type)}</span>}
+                                      </td>
                                       <td className="text-sm p-2">
                                           <p>{element.reason || "No reasoning provided"}</p>
                                           {hasRefs && (
@@ -126,11 +140,7 @@ export default function Home() {
                           <RagContextCard
                               ragContext={analysisResult.ragContext!}
                               selectedElementId={selectedElementId}
-                              elementNames={Object.fromEntries(
-                                  analysisResult.criticalElements
-                                      .filter(e => e.name)
-                                      .map(e => [e.id, e.name])
-                              )}
+                              elementNames={elementNames}
                           />
                       </TabsContent>
                   </CardContent>

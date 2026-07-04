@@ -70,8 +70,14 @@ class EvaluationRunner(
         val actualActivityIds = actualResult.expectedValues.map { it.value }
 
         val bpmnModel = parseBpmn(entry.bpmnXml)
+        val bpmnElements = bpmnExtractor.extractBpmnElements(bpmnModel)
 
-        val analysisNamesById = actualResult.analysisResponse.criticalElements
+        // Display-name fallbacks for unnamed elements: names the analysis resolved take
+        // precedence, then names derived from labeled flows (unnamed gateways/events) —
+        // the same derivation the analyzer uses, so both report columns render alike.
+        val labelOverrides = bpmnElements
+            .mapNotNull { el -> el.derivedNameFromFlows()?.let { el.id to it } }
+            .toMap() + actualResult.analysisResponse.criticalElements
             .mapNotNull { ce -> ce.name?.let { ce.id to it } }
             .toMap()
 
@@ -89,7 +95,6 @@ class EvaluationRunner(
         }
 
         val ragMetrics: RagMetrics? = if (evaluationRequest.evaluateRag && actualActivityIds.isNotEmpty()) {
-            val bpmnElements = bpmnExtractor.extractBpmnElements(entry.bpmnXml)
             ragasEvaluationService.scoreTestCase(actualResult.analysisResponse, bpmnElements)
         } else {
             if (evaluationRequest.evaluateRag && actualActivityIds.isEmpty()) {
@@ -122,20 +127,13 @@ class EvaluationRunner(
             correctActivityIds = classification.truePositiveIds,
             falsePositiveIds = classification.falsePositiveIds,
             falseNegativeIds = classification.falseNegativeIds,
-            expectedNamesWithIds = getNamesWithIds(bpmnModel, expectedActivityIds, analysisNamesById),
-            actualNamesWithIds = getNamesWithIds(bpmnModel, actualActivityIds, analysisNamesById),
+            expectedNamesWithIds = getNamesWithIds(bpmnModel, expectedActivityIds, labelOverrides),
+            actualNamesWithIds = getNamesWithIds(bpmnModel, actualActivityIds, labelOverrides),
             isSuccessful = metrics.isSuccessful,
             result = actualResult.expectedValues,
             amountOfRetries = actualResult.amountOfRetries,
             perElementType = perElementType,
-            ragMetrics = ragMetrics?.let {
-                TestCaseRagMetrics(
-                    faithfulness = it.faithfulness,
-                    contextUtilization = it.contextUtilization,
-                    sampleCount = it.sampleCount,
-                    failedCount = it.failedCount
-                )
-            },
+            ragMetrics = ragMetrics,
             // Expose the exact context bag sent to Ragas so the frontend can
             // display it next to each test case for manual audit.
             ragPromptContext = actualResult.analysisResponse.ragPromptContext

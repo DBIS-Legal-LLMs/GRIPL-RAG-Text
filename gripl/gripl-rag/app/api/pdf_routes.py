@@ -1,4 +1,5 @@
 """FastAPI router for serving PDF files and locating text within them."""
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException, Query
@@ -55,7 +56,8 @@ async def locate_in_pdf(
     if pdf_path is None:
         raise HTTPException(status_code=404, detail=f"PDF '{document_name}' not found")
 
-    result = locate_text_in_pdf(pdf_path, q)
+    # locate_text_in_pdf is CPU-bound (full-document scan) — keep it off the event loop.
+    result = await asyncio.to_thread(locate_text_in_pdf, pdf_path, q)
     if result is None:
         logger.info("No match for query in %s", document_name)
         return LocateResponse(page=None, rects=[], page_width=0, page_height=0)
@@ -80,7 +82,8 @@ async def locate_in_pdf_post(document_name: str, body: LocateRequest):
     if pdf_path is None:
         raise HTTPException(status_code=404, detail=f"PDF '{document_name}' not found")
 
-    result = locate_text_in_pdf(pdf_path, body.text)
+    # locate_text_in_pdf is CPU-bound (full-document scan) — keep it off the event loop.
+    result = await asyncio.to_thread(locate_text_in_pdf, pdf_path, body.text)
     if result is None:
         logger.info("No match for text in %s", document_name)
         return LocateResponse(page=None, rects=[], page_width=0, page_height=0)

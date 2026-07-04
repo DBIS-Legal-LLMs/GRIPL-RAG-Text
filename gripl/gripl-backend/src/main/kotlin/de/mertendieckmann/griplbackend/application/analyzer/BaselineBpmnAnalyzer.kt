@@ -19,6 +19,9 @@ class BaselineBpmnAnalyzer(
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
     override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: String): AnalysisResponse {
+        if (useRag) {
+            log.warn { "Baseline analyzer does not support RAG — useRag=true is ignored; results are baseline-only." }
+        }
         val sessionId = UUID.randomUUID().toString()
 
         val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)

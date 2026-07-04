@@ -113,10 +113,6 @@ export default function EvaluationReportSummaryCardSingle({ reportSummary }: Sum
                                 ))}
                             </TableBody>
                         </Table>
-                        <p className="text-sm text-muted-foreground mt-2">
-                            Ground-truth labels of older datasets only cover activities, so false positives on
-                            events, gateways, and data objects there may reflect incomplete labels rather than model errors.
-                        </p>
                     </CardContent>
                 </Card>
             )}

@@ -18,7 +18,7 @@ class RagasApiClient(
 
     private val log = KotlinLogging.logger {}
 
-    private val evaluationUrl: String by lazy { deriveEvaluationUrl(ragApiProperties.url) }
+    private val evaluationUrl: String by lazy { "${ragApiProperties.baseUrl}/api/evaluate/ragas" }
     private val webClient: WebClient by lazy { webClientBuilder.build() }
 
     suspend fun evaluate(request: RagasEvaluationRequest): RagasEvaluationResponse {
@@ -35,17 +35,6 @@ class RagasApiClient(
         } catch (e: Exception) {
             log.error(e) { "Ragas evaluation call failed" }
             throw RuntimeException("Failed to call Ragas evaluator at $evaluationUrl", e)
-        }
-    }
-
-    private fun deriveEvaluationUrl(queryUrl: String): String {
-        val trimmed = queryUrl.trimEnd('/')
-        // Replace a trailing /query (or /api/query) with /evaluate/ragas under the same /api.
-        return when {
-            trimmed.endsWith("/api/query") -> trimmed.removeSuffix("/query") + "/evaluate/ragas"
-            trimmed.endsWith("/query") -> trimmed.removeSuffix("/query") + "/evaluate/ragas"
-            trimmed.endsWith("/api") -> "$trimmed/evaluate/ragas"
-            else -> "$trimmed/api/evaluate/ragas"
         }
     }
 }
