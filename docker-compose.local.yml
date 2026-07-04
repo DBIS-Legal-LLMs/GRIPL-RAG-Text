@@ -1,90 +1,103 @@
-version: "3.9"
-
 services:
-  traefik:
-    image: traefik:v3.1
-    container_name: traefik-local
-    restart: unless-stopped
-    command:
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --entrypoints.web.address=:80
-    ports:
-      - "${WEB_PORT:-8000}:80"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - app
-
   gripl-frontend:
     build:
+      context: ./gripl/gripl-frontend
+      dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://gripl-backend:8080}
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.gripl-frontend.rule=Host(`localhost`)
-      - traefik.http.routers.gripl-frontend.entrypoints=web
-      - traefik.http.services.gripl-frontend.loadbalancer.server.port=${FRONTEND_PORT:-3000}
+        - NEXT_PUBLIC_API_BASE_URL=http://gripl-backend:8080
+    image: gripl-f:latest
+    container_name: gripl-frontend
+    restart: unless-stopped
     networks:
       - app
+    ports:
+      - "3000:3000"
 
   gripl-backend:
+    build:
+      context: ./gripl/gripl-backend
+      dockerfile: Dockerfile
+    image: gripl-b:latest
+    container_name: gripl-backend
+    restart: unless-stopped
+    depends_on:
+      - gripl-postgres
+      - gripl-neo4j
     env_file:
       - .env.local
     environment:
-      - FRONTEND_BASE_URL=http://localhost:${WEB_PORT:-8000}
-      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/${POSTGRES_DB:-gripldb}
-      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER:-postgres}
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      # RAG service base URL — reachable by Docker service name inside the app network
+      - FRONTEND_BASE_URL=http://localhost:3000
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://gripl-postgres:5432/gripldb
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
       - RAG_API_URL=http://gripl-rag:8081
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.gripl-backend.rule=Host(`localhost`) && PathPrefix(`/api`)
-      - traefik.http.routers.gripl-backend.entrypoints=web
-      - traefik.http.middlewares.gripl-backend-strip-prefix.stripprefix.prefixes=/api
-      - traefik.http.routers.gripl-backend.middlewares=gripl-backend-strip-prefix
-      - traefik.http.services.gripl-backend.loadbalancer.server.port=${BACKEND_PORT:-8080}
-      - traefik.http.routers.gripl-backend-webjars.rule=Host(`localhost`) && PathPrefix(`/webjars`)
-      - traefik.http.routers.gripl-backend-webjars.entrypoints=web
-      - traefik.http.routers.gripl-backend-webjars.service=gripl-backend
+    volumes:
+      - playwright-browsers:/root/.cache/ms-playwright
     networks:
       - app
+    ports:
+      - "8000:8080"
 
   gripl-rag:
+    build:
+      context: ./gripl/gripl-rag
+      dockerfile: Dockerfile
+    image: gripl-rag:latest
+    container_name: gripl-rag
+    restart: unless-stopped
+    depends_on:
+      - gripl-neo4j
     env_file:
       - .env.local
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.gripl-rag.rule=Host(`localhost`) && PathPrefix(`/rag`)
-      - traefik.http.routers.gripl-rag.entrypoints=web
-      - traefik.http.middlewares.gripl-rag-strip-prefix.stripprefix.prefixes=/rag
-      - traefik.http.routers.gripl-rag.middlewares=gripl-rag-strip-prefix
-      - traefik.http.services.gripl-rag.loadbalancer.server.port=${RAG_PORT:-8081}
+    environment:
+      - NEO4J_URI=neo4j://gripl-neo4j:7687
+      - NEO4J_USERNAME=neo4j
+      - NEO4J_PASSWORD=gripl-rag-2026
     volumes:
       - ./gripl/gripl-rag/rag_working_dir:/app/rag_working_dir
       - ./gripl/gripl-rag/data:/app/data
       - huggingface_cache:/root/.cache/huggingface
     networks:
       - app
-
-  gripl-postgres:
-    env_file:
-      - .env.local
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "8081:8081"
 
-  # Local override: expose Neo4j ports on the host for browsing/debugging.
-  # The service itself is defined in docker-compose.yml.
   gripl-neo4j:
+    image: neo4j:5-community
+    container_name: gripl-neo4j
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=neo4j/gripl-rag-2026
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - app
     ports:
       - "7474:7474"
       - "7687:7687"
 
+  gripl-postgres:
+    image: postgres:15
+    container_name: gripl-postgres
+    restart: unless-stopped
+    volumes:
+      - gripl-postgres-data:/var/lib/postgresql/data
+    networks:
+      - app
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=gripldb
+
+volumes:
+  playwright-browsers:
+  gripl-postgres-data:
+  huggingface_cache:
+  neo4j_data:
+
 networks:
   app:
     external: false
-
-volumes:
-  huggingface_cache:
