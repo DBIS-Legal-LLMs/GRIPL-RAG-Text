@@ -35,8 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy application source
 COPY app/ ./app/
+COPY scripts/ ./scripts/
 
 # Expose the port uvicorn will listen on
 EXPOSE 8081
