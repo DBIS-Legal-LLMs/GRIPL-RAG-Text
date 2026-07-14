@@ -16,7 +16,7 @@ from app.schemas.query import (
     HealthResponse,
 )
 from app.rag.engine import create_rag_instance
-from app.rag.parser import parse_rag_response
+from app.rag.parser import parse_rag_data
 
 logger = logging.getLogger(__name__)
 
@@ -64,15 +64,15 @@ async def query_rag(request: QueryRequest):
         if mode == "global_":
             mode = "global"
 
-        # only_need_context=True → return raw retrieved chunks,
-        # not an LLM-generated answer.
-        logger.debug("Querying mode=%s, only_need_context=True", mode)
-        
+        # aquery_data runs retrieval only (no LLM answer) and returns the
+        # entities/relationships/chunks as structured data.
+        logger.debug("Querying mode=%s via aquery_data", mode)
+
         try:
             result = await asyncio.wait_for(
-                rag.aquery(
+                rag.aquery_data(
                     request.query,
-                    param=QueryParam(mode=mode, only_need_context=True),
+                    param=QueryParam(mode=mode),
                 ),
                 timeout=300.0
             )
@@ -80,17 +80,13 @@ async def query_rag(request: QueryRequest):
             logger.error("LightRAG query timed out")
             raise HTTPException(status_code=504, detail="RAG query timed out")
 
-        logger.debug("LightRAG returned type %s", type(result))
         logger.debug("LightRAG returned: %s", repr(result)[:500])
 
-        if result is None:
-            result = ""
+        # Map LightRAG's structured payload into the UI response shape
+        parsed_result = parse_rag_data(result or {})
 
-        # Parse the raw markdown/JSON string into structured dict
-        parsed_result = parse_rag_response(result)
-    
-        logger.info("Query completed successfully (response length=%d, entities=%d, relationships=%d, documents=%d)", 
-                    len(result), len(parsed_result["entities"]), 
+        logger.info("Query completed successfully (entities=%d, relationships=%d, documents=%d)",
+                    len(parsed_result["entities"]),
                     len(parsed_result["relationships"]), len(parsed_result["documents"]))
 
         return QueryResponse(
