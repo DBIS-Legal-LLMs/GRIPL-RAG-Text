@@ -182,8 +182,9 @@ def parse_rag_data(raw_data: Dict) -> Dict:
         target_id = entity_map[normalize_key(target)]
 
         # Deduplicate relationships.
-        # BPMN flows are directed edges.
-        rel_key = (source_id, target_id)
+        # BPMN flows are directed edges; the label is part of the key so
+        # distinct relationships between the same pair are all kept.
+        rel_key = (source_id, target_id, normalize_key(label))
         if rel_key in seen_rels:
             continue
         seen_rels.add(rel_key)
