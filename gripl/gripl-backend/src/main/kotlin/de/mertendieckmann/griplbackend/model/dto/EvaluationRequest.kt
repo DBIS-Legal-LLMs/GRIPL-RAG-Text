@@ -9,7 +9,7 @@ data class EvaluationRequest(
     val datasets: List<Int>,
     val evaluationDataIds: List<Int> = emptyList(),
     val useRag: Boolean = false,
-    val ragMode: String = "hybrid",
+    val ragMode: RagMode = RagMode.HYBRID,
     val evaluateRag: Boolean = true
 ) {
     override fun toString(): String =

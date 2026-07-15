@@ -1,6 +1,7 @@
 package de.mertendieckmann.griplbackend.adapter.rag
 
 import de.mertendieckmann.griplbackend.config.RagApiProperties
+import de.mertendieckmann.griplbackend.model.dto.RagMode
 import de.mertendieckmann.griplbackend.model.dto.RagRequest
 import de.mertendieckmann.griplbackend.model.dto.RagResponseWrapper
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -25,7 +26,7 @@ class RagApiClient(
     /**
      * Calls the RAG service and returns a typed response.
      */
-    suspend fun queryRag(queryText: String, ragMode: String): RagResponseWrapper {
+    suspend fun queryRag(queryText: String, ragMode: RagMode): RagResponseWrapper {
         log.info { "Querying RAG service with mode=$ragMode" }
 
         return try {

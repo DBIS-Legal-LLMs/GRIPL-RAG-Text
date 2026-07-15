@@ -5,6 +5,7 @@ import de.mertendieckmann.griplbackend.ai.SharedChatMemoryProvider
 import de.mertendieckmann.griplbackend.application.BpmnExtractor
 import de.mertendieckmann.griplbackend.application.SafetyNet
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
+import de.mertendieckmann.griplbackend.model.dto.RagMode
 import dev.langchain4j.model.chat.ChatModel
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.*
@@ -18,7 +19,7 @@ class BaselineBpmnAnalyzer(
     private val bpmnAnalysisAiService = BaselineBpmnAnalysisAiServiceFactory.create(llm, memoryProvider)
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
-    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: String): AnalysisResponse {
+    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: RagMode): AnalysisResponse {
         if (useRag) {
             log.warn { "Baseline analyzer does not support RAG — useRag=true is ignored; results are baseline-only." }
         }

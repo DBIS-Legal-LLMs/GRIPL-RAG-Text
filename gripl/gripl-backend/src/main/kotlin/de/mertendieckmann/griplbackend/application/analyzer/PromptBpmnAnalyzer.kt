@@ -10,6 +10,7 @@ import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.RagDocument
 import de.mertendieckmann.griplbackend.model.dto.RagElementContext
 import de.mertendieckmann.griplbackend.model.dto.RagEntity
+import de.mertendieckmann.griplbackend.model.dto.RagMode
 import de.mertendieckmann.griplbackend.model.dto.RagRelationship
 import dev.langchain4j.model.chat.ChatModel
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -30,7 +31,7 @@ class PromptBpmnAnalyzer(
     private val bpmnAnalysisAiServiceNoRag = PromptBpmnAnalysisAiServiceFactory.createWithoutRag(llm, memoryProvider)
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
-    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: String): AnalysisResponse {
+    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: RagMode): AnalysisResponse {
         val sessionId = UUID.randomUUID().toString()
 
         val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)
@@ -81,7 +82,7 @@ class PromptBpmnAnalyzer(
 
     private fun fetchRagContext(
         bpmnElements: Set<BpmnElement>,
-        ragMode: String,
+        ragMode: RagMode,
         maxConcurrency: Int = 8
     ): Map<String, Map<String, Any>> {
         val semaphore = Semaphore(maxConcurrency)

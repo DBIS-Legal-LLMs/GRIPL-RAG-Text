@@ -5,6 +5,7 @@ import de.mertendieckmann.griplbackend.application.analyzer.AnalyzerFactory
 import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.AnalysisEndpoint
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
+import de.mertendieckmann.griplbackend.model.dto.RagMode
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.core.env.Environment
@@ -13,6 +14,7 @@ import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.http.codec.multipart.FilePart
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.server.ResponseStatusException
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 
@@ -52,7 +54,7 @@ class AnalysisController(
     ): Mono<ResponseEntity<AnalysisResponse>> {
 
         val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
-        val ragMode = ragModePart?.value() ?: "hybrid"
+        val ragMode = parseRagMode(ragModePart)
 
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
         val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
@@ -87,7 +89,7 @@ class AnalysisController(
     ): Mono<ResponseEntity<AnalysisResponse>> {
 
         val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
-        val ragMode = ragModePart?.value() ?: "hybrid"   
+        val ragMode = parseRagMode(ragModePart)
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
         val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
 
@@ -102,4 +104,13 @@ class AnalysisController(
                 )            }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
-}   
+
+    private fun parseRagMode(ragModePart: org.springframework.http.codec.multipart.FormFieldPart?): RagMode {
+        val raw = ragModePart?.value() ?: return RagMode.HYBRID
+        return try {
+            RagMode.fromString(raw)
+        } catch (e: IllegalArgumentException) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
+        }
+    }
+}
