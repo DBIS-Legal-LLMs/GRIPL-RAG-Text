@@ -8,6 +8,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.reactor.awaitSingle
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
+import java.time.Duration
 
 @Service
 class RagApiClient(
@@ -35,6 +36,7 @@ class RagApiClient(
                 .bodyValue(RagRequest(query = queryText, mode = ragMode))
                 .retrieve()
                 .bodyToMono(RagResponseWrapper::class.java)
+                .timeout(Duration.ofMinutes(10))
                 .awaitSingle()
         } catch (e: Exception) {
             log.error(e) { "RAG service call failed for query: $queryText" }
