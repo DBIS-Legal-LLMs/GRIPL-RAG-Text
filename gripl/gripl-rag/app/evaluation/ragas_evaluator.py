@@ -203,15 +203,12 @@ def _build_sample(query: str, contexts: list[str], response: str):
     )
 
 
-_METRIC_TIMEOUT_SECONDS = 600.0
-
-
 async def _score_one(metric, sample) -> Optional[float]:
     """Score a single sample with one metric, returning None on failure or timeout."""
     try:
         score = await asyncio.wait_for(
             metric.single_turn_ascore(sample),
-            timeout=_METRIC_TIMEOUT_SECONDS,
+            timeout=settings.ragas_metric_timeout,
         )
         if score is None or math.isnan(score):
             return None
@@ -220,7 +217,7 @@ async def _score_one(metric, sample) -> Optional[float]:
         logger.warning(
             "Ragas metric %s timed out after %.0fs — skipping",
             type(metric).__name__,
-            _METRIC_TIMEOUT_SECONDS,
+            settings.ragas_metric_timeout,
         )
         return None
     except Exception as exc:  # noqa: BLE001

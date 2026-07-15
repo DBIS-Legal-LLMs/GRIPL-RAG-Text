@@ -15,6 +15,7 @@ from app.schemas.query import (
     QueryResponse,
     HealthResponse,
 )
+from app.config import settings
 from app.rag.engine import create_rag_instance
 from app.rag.parser import parse_rag_data
 
@@ -74,10 +75,10 @@ async def query_rag(request: QueryRequest):
                     request.query,
                     param=QueryParam(mode=mode),
                 ),
-                timeout=300.0
+                timeout=settings.rag_query_timeout
             )
         except asyncio.TimeoutError:
-            logger.error("LightRAG query timed out")
+            logger.error("LightRAG query timed out after %.0fs", settings.rag_query_timeout)
             raise HTTPException(status_code=504, detail="RAG query timed out")
 
         logger.debug("LightRAG returned: %s", repr(result)[:500])
@@ -96,6 +97,8 @@ async def query_rag(request: QueryRequest):
             status="success",
         )
 
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Query failed: %s", exc)
         raise HTTPException(
