@@ -55,9 +55,40 @@ const TYPE_COLORS: Record<string, string> = {
     DEADLINE: "#f59e0b",
 };
 
+// Entity types are LLM-generated free text, so anything can show up beyond
+// TYPE_COLORS. Unlisted types hash into this fixed palette (validated for
+// light/dark contrast and CVD separation) so distinct types stay visually
+// distinct instead of all collapsing into one gray.
+// All from the same tone family (Tailwind 600 weight) so they sit together
+// visually and alongside the TYPE_COLORS hues.
+const FALLBACK_COLORS = [
+    "#2563eb", "#ea580c", "#16a34a", "#7c3aed",
+    "#b45309", "#0891b2", "#db2777", "#dc2626",
+];
+
+// djb2 — deterministic, so a type keeps its color across renders and sessions.
+function hashString(s: string): number {
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) {
+        h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+    }
+    return h;
+}
+
 function getNodeColor(type: string): string {
-    const upper = type?.toUpperCase() ?? "";
-    return TYPE_COLORS[upper] ?? "#94a3b8";
+    const upper = type?.trim().toUpperCase() ?? "";
+    if (!upper || upper === "UNKNOWN") return "#94a3b8";
+    return TYPE_COLORS[upper] ?? FALLBACK_COLORS[hashString(upper) % FALLBACK_COLORS.length];
+}
+
+// "LEGAL_PROVISION" → "Legal Provision" for legend display
+function prettifyType(type: string): string {
+    const t = type?.trim();
+    if (!t) return "Unknown";
+    return t
+        .replace(/_/g, " ")
+        .toLowerCase()
+        .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function getNodeRadius(connectionCount: number): number {
@@ -130,6 +161,30 @@ export default function KnowledgeGraph({ entities, relationships, onNodeClick }:
 
         return { nodes, links };
     }, [entities, relationships]);
+
+    // Legend reflects the types actually plotted, colored by the same
+    // getNodeColor the nodes use — so it can never drift out of sync.
+    const legendItems = useMemo(() => {
+        // Key by prettified label, but color from the raw type string so the
+        // swatch matches exactly what getNodeColor painted on the nodes.
+        const byLabel = new Map<string, { rawType: string; count: number }>();
+        for (const n of graphData.nodes) {
+            const label = prettifyType(n.type);
+            const entry = byLabel.get(label);
+            if (entry) entry.count += 1;
+            else byLabel.set(label, { rawType: n.type, count: 1 });
+        }
+        const sorted = [...byLabel.entries()].sort((a, b) => b[1].count - a[1].count);
+
+        // Max 4 entries, with "Unknown" always last regardless of its count.
+        const unknown = sorted.find(([label]) => label === "Unknown");
+        const named = sorted.filter(([label]) => label !== "Unknown");
+        const shown = unknown ? [...named.slice(0, 3), unknown] : named.slice(0, 4);
+        return {
+            top: shown.map(([label, { rawType }]) => ({ label, color: getNodeColor(rawType) })),
+            more: sorted.length - shown.length,
+        };
+    }, [graphData]);
 
     // Pin a node only after the user drags it, so it stays where they put it
     // but the rest of the graph remains free to react to the force simulation.
@@ -249,20 +304,17 @@ export default function KnowledgeGraph({ entities, relationships, onNodeClick }:
                 </div>
             )}
 
-            {/* Legend */}
+            {/* Legend — derived from the types actually present in the graph */}
             <div className="absolute top-2 right-2 bg-background/80 border border-border rounded-md p-1.5 text-xs space-y-0.5">
-                {Object.entries({
-                    "Regulation / Law": "#3b82f6",
-                    "Obligation": "#f97316",
-                    "Party / Actor": "#22c55e",
-                    "Process": "#a855f7",
-                    "Other": "#94a3b8",
-                }).map(([label, color]) => (
+                {legendItems.top.map(({ label, color }) => (
                     <div key={label} className="flex items-center gap-1.5">
                         <span className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                         <span className="text-muted-foreground">{label}</span>
                     </div>
                 ))}
+                {legendItems.more > 0 && (
+                    <div className="text-muted-foreground/70 pl-4">+{legendItems.more} more</div>
+                )}
             </div>
         </div>
     );
