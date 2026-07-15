@@ -5,6 +5,10 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Successful resolutions only — misses are re-scanned so newly added corpus
+# files are still picked up without a restart.
+_resolve_cache: dict[str, Path] = {}
+
 
 def _normalise(name: str) -> str:
     return name.lower().replace("-", "_").replace(" ", "_")
@@ -18,7 +22,16 @@ def resolve_pdf_path(document_name: str) -> Path | None:
     Matching is case-insensitive and treats hyphens and underscores as
     equivalent, because full_doc_id values use hyphens while some filenames
     use underscores.
+
+    Successful lookups are cached (validated against the filesystem on each
+    hit) so repeated citation requests skip the recursive directory walk.
     """
+    cached = _resolve_cache.get(document_name)
+    if cached is not None:
+        if cached.is_file():
+            return cached
+        del _resolve_cache[document_name]
+
     base = Path(settings.pdf_data_dir)
     if not base.is_dir():
         return None
@@ -28,6 +41,7 @@ def resolve_pdf_path(document_name: str) -> Path | None:
     for pdf_file in base.rglob("*.pdf"):
         stem_norm = _normalise(pdf_file.stem)
         if stem_norm == needle:
+            _resolve_cache[document_name] = pdf_file
             return pdf_file
         # Fallback: tolerate truncated identifiers (e.g. "..._v2" → "..._v2.0_en").
         # Only used if no exact match is found across all dirs.
@@ -35,6 +49,7 @@ def resolve_pdf_path(document_name: str) -> Path | None:
             prefix_matches.append(pdf_file)
 
     if len(prefix_matches) == 1:
+        _resolve_cache[document_name] = prefix_matches[0]
         return prefix_matches[0]
 
     if len(prefix_matches) > 1:
