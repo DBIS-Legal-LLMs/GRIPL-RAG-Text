@@ -65,9 +65,39 @@ class EvaluationRunner(
         entry: EvaluationData,
         evaluationRequest: EvaluationRequest
     ): EvaluationOutcome = try {
+        evaluateEntryOrFailFast(entry, evaluationRequest)
+    } catch (e: Exception) {
+        EvaluationOutcome.Error(
+            EvaluationReportError(
+                testCaseId = entry.id,
+                datasetId = entry.datasetId,
+                testCaseName = entry.name ?: "Test Case ${entry.id}",
+                errorMessage = e.message ?: "Unbekannter Fehler aufgetreten"
+            )
+        )
+    }
+
+    private suspend fun evaluateEntryOrFailFast(
+        entry: EvaluationData,
+        evaluationRequest: EvaluationRequest
+    ): EvaluationOutcome {
         val expectedActivityIds = entry.expectedValues.map { it.value }
         val actualResult = evaluator.evaluate(entry.bpmnXml, evaluationRequest)
         val actualActivityIds = actualResult.expectedValues.map { it.value }
+
+        if (evaluationRequest.evaluateRag && actualResult.analysisResponse.ragPromptContext == null) {
+            return EvaluationOutcome.Error(
+                EvaluationReportError(
+                    testCaseId = entry.id,
+                    datasetId = entry.datasetId,
+                    testCaseName = entry.name ?: "Test Case ${entry.id}",
+                    errorMessage = "RAG evaluation (evaluateRag=true) was requested, but endpoint " +
+                        "'${evaluationRequest.evaluationEndpoint}' returned no RAG context — the endpoint " +
+                        "does not support RAG (e.g. baseline) or useRag is false. " +
+                        "Disable 'Evaluate RAG Quality' or use a RAG-capable endpoint with useRag=true."
+                )
+            )
+        }
 
         val bpmnModel = parseBpmn(entry.bpmnXml)
         val bpmnElements = bpmnExtractor.extractBpmnElements(bpmnModel)
@@ -139,16 +169,6 @@ class EvaluationRunner(
             ragPromptContext = actualResult.analysisResponse.ragPromptContext
         )
 
-        EvaluationOutcome.Success(testCaseReport, metrics)
-
-    } catch (e: Exception) {
-        EvaluationOutcome.Error(
-            EvaluationReportError(
-                testCaseId = entry.id,
-                datasetId = entry.datasetId,
-                testCaseName = entry.name ?: "Test Case ${entry.id}",
-                errorMessage = e.message ?: "Unbekannter Fehler aufgetreten"
-            )
-        )
+        return EvaluationOutcome.Success(testCaseReport, metrics)
     }
 }
