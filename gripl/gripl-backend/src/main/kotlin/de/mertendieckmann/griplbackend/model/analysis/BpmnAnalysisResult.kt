@@ -1,6 +1,7 @@
 package de.mertendieckmann.griplbackend.model.analysis
 
 import de.mertendieckmann.griplbackend.model.BpmnElement
+import io.github.oshai.kotlinlogging.KotlinLogging
 import jdk.jfr.Description
 
 data class BpmnAnalysisResult(
@@ -62,9 +63,19 @@ data class BpmnAnalysisResult(
         if (partialId in existingElementIds) return partialId
 
         val prefixMatches = existingElementIds.filter { it.startsWith(partialId) }
-        prefixMatches.singleOrNull()?.let { return it }
+        prefixMatches.singleOrNull()?.let {
+            log.warn { "LLM element ID '$partialId' is not an exact match; resolved via unique prefix match to '$it'" }
+            return it
+        }
 
-        val substringMatches = existingElementIds.filter { it.contains(partialId) }
-        return substringMatches.singleOrNull()
+        val substringMatch = existingElementIds.filter { it.contains(partialId) }.singleOrNull()
+        if (substringMatch != null) {
+            log.warn { "LLM element ID '$partialId' is not an exact match; resolved via unique substring match to '$substringMatch'" }
+        }
+        return substringMatch
+    }
+
+    companion object {
+        private val log = KotlinLogging.logger {}
     }
 }
