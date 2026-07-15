@@ -178,7 +178,7 @@ def _get_embedding_func():
 
         async def _local_embed(texts: list[str]) -> "np.ndarray":
             import numpy as np
-            embeddings = model.encode(texts)
+            embeddings = await asyncio.to_thread(model.encode, texts)
             return np.array(embeddings, dtype=np.float32)
 
         return EmbeddingFunc(
@@ -250,8 +250,8 @@ async def create_rag_instance() -> LightRAG:
     _set_neo4j_env_vars()
 
     llm_func = _get_llm_func()
-    embedding_func = _get_embedding_func()
-    rerank_func = _get_rerank_func()
+    embedding_func = await asyncio.to_thread(_get_embedding_func)
+    rerank_func = await asyncio.to_thread(_get_rerank_func)
 
     rag = LightRAG(
         working_dir=str(working_dir),
