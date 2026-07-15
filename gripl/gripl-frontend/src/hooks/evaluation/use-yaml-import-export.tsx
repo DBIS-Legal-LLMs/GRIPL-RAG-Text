@@ -19,6 +19,7 @@ export function useYamlImportExport(props: {
     useRag: boolean;
     ragMode: string;
     evaluateRag: boolean;
+    activitiesOnly: boolean;
     setDefaultEndpointChoice: (v: "preset" | "custom") => void;
     setDefaultPresetEndpoint: (v: string) => void;
     setDefaultCustomEndpoint: (v: string) => void;
@@ -30,6 +31,7 @@ export function useYamlImportExport(props: {
     setUseRag: (v: boolean) => void;
     setRagMode: (v: string) => void;
     setEvaluateRag: (v: boolean) => void;
+    setActivitiesOnly: (v: boolean) => void;
 }) {
     const {
         availableEvaluationEndpoints,
@@ -42,6 +44,7 @@ export function useYamlImportExport(props: {
         useRag,
         ragMode,
         evaluateRag,
+        activitiesOnly,
         setDefaultEndpointChoice,
         setDefaultPresetEndpoint,
         setDefaultCustomEndpoint,
@@ -53,6 +56,7 @@ export function useYamlImportExport(props: {
         setUseRag,
         setRagMode,
         setEvaluateRag,
+        setActivitiesOnly,
     } = props;
 
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -113,6 +117,7 @@ export function useYamlImportExport(props: {
         if (typeof cfg?.useRag === "boolean") setUseRag(cfg.useRag);
         if (typeof cfg?.ragMode === "string" && cfg.ragMode) setRagMode(cfg.ragMode);
         if (typeof cfg?.evaluateRag === "boolean") setEvaluateRag(cfg.evaluateRag);
+        if (typeof cfg?.activitiesOnly === "boolean") setActivitiesOnly(cfg.activitiesOnly);
 
         if (modelItems.length > 0) {
             const next: ModelRowState[] = modelItems.map((model: any, idx: number) => {
@@ -196,6 +201,7 @@ export function useYamlImportExport(props: {
             useRag,
             ragMode,
             evaluateRag: useRag && evaluateRag,
+            activitiesOnly,
         };
     }
 

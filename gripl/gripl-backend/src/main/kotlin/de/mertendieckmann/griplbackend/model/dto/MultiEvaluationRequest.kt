@@ -13,6 +13,7 @@ data class MultiEvaluationRequest(
     val useRag: Boolean = false,
     val ragMode: RagMode = RagMode.HYBRID,
     val evaluateRag: Boolean = true,
+    val activitiesOnly: Boolean = false,
 )
 
 data class ModelRunConfig(

@@ -39,9 +39,10 @@ fun computeTrueNegativesCount(
     bpmnModel: BpmnModelInstance,
     truePositivesCount: Int,
     falsePositivesCount: Int,
-    falseNegativesCount: Int
+    falseNegativesCount: Int,
+    activitiesOnly: Boolean = false
 ): Int {
-    val totalClassifiableElements = classifiableElementIds(bpmnModel).size
+    val totalClassifiableElements = classifiableElementIds(bpmnModel, activitiesOnly).size
     return (totalClassifiableElements - truePositivesCount - falsePositivesCount - falseNegativesCount)
         .coerceAtLeast(0)
 }
@@ -51,15 +52,17 @@ fun computeTrueNegativesCount(
  * flow nodes (activities, events, gateways) plus data object/store references.
  * Mirrors the element types extracted by BpmnExtractor (text annotations excluded),
  * so the true-negative universe matches what is actually classified.
+ * With [activitiesOnly], the universe is restricted to activities.
  */
-private fun classifiableElementIds(bpmnModel: BpmnModelInstance): Set<String> =
-    classifiableElements(bpmnModel).map { it.id }.toSet()
+fun classifiableElementIds(bpmnModel: BpmnModelInstance, activitiesOnly: Boolean = false): Set<String> =
+    classifiableElements(bpmnModel, activitiesOnly).map { it.id }.toSet()
 
-private fun classifiableElements(bpmnModel: BpmnModelInstance): List<BaseElement> =
+private fun classifiableElements(bpmnModel: BpmnModelInstance, activitiesOnly: Boolean = false): List<BaseElement> =
     (bpmnModel.getModelElementsByType(FlowNode::class.java) +
         bpmnModel.getModelElementsByType(DataObjectReference::class.java) +
         bpmnModel.getModelElementsByType(DataStoreReference::class.java))
         .distinctBy { it.id }
+        .filter { !activitiesOnly || it is Activity }
 
 /**
  * The element categories metrics are broken down by. The [key] is the stable identifier
@@ -90,9 +93,10 @@ private fun categorize(element: BaseElement): ElementCategory = when (element) {
  */
 fun computePerElementTypeCounts(
     bpmnModel: BpmnModelInstance,
-    classification: ClassificationSets
+    classification: ClassificationSets,
+    activitiesOnly: Boolean = false
 ): Map<String, ElementTypeCounts> {
-    val categoryById = classifiableElements(bpmnModel).associate { it.id to categorize(it) }
+    val categoryById = classifiableElements(bpmnModel, activitiesOnly).associate { it.id to categorize(it) }
 
     fun byCategory(ids: List<String>): Map<ElementCategory, Int> =
         ids.groupingBy { categoryById[it] ?: ElementCategory.OTHER }.eachCount()

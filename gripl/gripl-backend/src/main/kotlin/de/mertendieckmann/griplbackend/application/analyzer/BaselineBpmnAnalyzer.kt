@@ -11,20 +11,20 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.*
 
 class BaselineBpmnAnalyzer(
-    llm: ChatModel
+    private val llm: ChatModel
 ): BpmnAnalyzer {
 
     private val log = KotlinLogging.logger { }
     private val memoryProvider = SharedChatMemoryProvider(50)
-    private val bpmnAnalysisAiService = BaselineBpmnAnalysisAiServiceFactory.create(llm, memoryProvider)
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
-    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: RagMode): AnalysisResponse {
+    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: RagMode, activitiesOnly: Boolean): AnalysisResponse {
         if (useRag) {
             log.warn { "Baseline analyzer does not support RAG — useRag=true is ignored; results are baseline-only." }
         }
         val sessionId = UUID.randomUUID().toString()
 
+        val bpmnAnalysisAiService = BaselineBpmnAnalysisAiServiceFactory.create(llm, memoryProvider, activitiesOnly)
         val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)
 
         val result = safetyNet.safeGuardAnalysisResultParsing(

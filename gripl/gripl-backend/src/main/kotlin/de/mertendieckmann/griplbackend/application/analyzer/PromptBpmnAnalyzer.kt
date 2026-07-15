@@ -21,24 +21,23 @@ import kotlinx.coroutines.sync.withPermit
 import java.util.*
 
 class PromptBpmnAnalyzer(
-    llm: ChatModel,
+    private val llm: ChatModel,
     private val ragApiClient: RagApiClient
 ) : BpmnAnalyzer {
 
     private val log = KotlinLogging.logger { }
     private val memoryProvider = SharedChatMemoryProvider(50)
-    private val bpmnAnalysisAiServiceWithRag = PromptBpmnAnalysisAiServiceFactory.create(llm, memoryProvider)
-    private val bpmnAnalysisAiServiceNoRag = PromptBpmnAnalysisAiServiceFactory.createWithoutRag(llm, memoryProvider)
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
-    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: RagMode): AnalysisResponse {
+    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: RagMode, activitiesOnly: Boolean): AnalysisResponse {
         val sessionId = UUID.randomUUID().toString()
 
         val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)
 
         if (useRag) {
             // RAG-augmented path
-            val ragContextMap = fetchRagContext(bpmnElements, ragMode)
+            val bpmnAnalysisAiServiceWithRag = PromptBpmnAnalysisAiServiceFactory.create(llm, memoryProvider, activitiesOnly)
+            val ragContextMap = fetchRagContext(bpmnElements, ragMode, activitiesOnly = activitiesOnly)
 
             val pool = buildDedupedPool(ragContextMap)
 
@@ -63,6 +62,7 @@ class PromptBpmnAnalyzer(
             )
         } else {
             // Original path — unchanged from evaluation baseline
+            val bpmnAnalysisAiServiceNoRag = PromptBpmnAnalysisAiServiceFactory.createWithoutRag(llm, memoryProvider, activitiesOnly)
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
                 bpmnAnalysisAiServiceNoRag.analyze(sessionId, bpmnElements)
             }
@@ -83,7 +83,8 @@ class PromptBpmnAnalyzer(
     private fun fetchRagContext(
         bpmnElements: Set<BpmnElement>,
         ragMode: RagMode,
-        maxConcurrency: Int = 8
+        maxConcurrency: Int = 8,
+        activitiesOnly: Boolean = false
     ): Map<String, Map<String, Any>> {
         val semaphore = Semaphore(maxConcurrency)
 
@@ -94,7 +95,9 @@ class PromptBpmnAnalyzer(
                         // Retrieve GDPR context for every classifiable element (activities,
                         // events, gateways, data objects/stores) — not just activities. Only
                         // textAnnotation is excluded, as it is never classified.
+                        // In activitiesOnly mode, only activities are classified
                         if (element.type.equals("textAnnotation", ignoreCase = true)) return@async null
+                        if (activitiesOnly && !element.isActivity) return@async null
 
                         val flowLabelText = (element.outgoingFlowLabels + element.incomingFlowLabels +
                                 element.outgoingMessageFlowLabels + element.incomingMessageFlowLabels)

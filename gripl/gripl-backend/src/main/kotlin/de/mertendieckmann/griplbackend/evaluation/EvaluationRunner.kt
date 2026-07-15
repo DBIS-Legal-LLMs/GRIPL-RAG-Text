@@ -81,9 +81,7 @@ class EvaluationRunner(
         entry: EvaluationData,
         evaluationRequest: EvaluationRequest
     ): EvaluationOutcome {
-        val expectedActivityIds = entry.expectedValues.map { it.value }
         val actualResult = evaluator.evaluate(entry.bpmnXml, evaluationRequest)
-        val actualActivityIds = actualResult.expectedValues.map { it.value }
 
         if (evaluationRequest.evaluateRag && actualResult.analysisResponse.ragPromptContext == null) {
             return EvaluationOutcome.Error(
@@ -102,6 +100,15 @@ class EvaluationRunner(
         val bpmnModel = parseBpmn(entry.bpmnXml)
         val bpmnElements = bpmnExtractor.extractBpmnElements(bpmnModel)
 
+        // With activitiesOnly, scoring is restricted to activities
+        val scopeIds: Set<String>? = if (evaluationRequest.activitiesOnly) {
+            classifiableElementIds(bpmnModel, activitiesOnly = true)
+        } else null
+        val expectedActivityIds = entry.expectedValues.map { it.value }
+            .filter { scopeIds == null || it in scopeIds }
+        val actualActivityIds = actualResult.expectedValues.map { it.value }
+            .filter { scopeIds == null || it in scopeIds }
+
         // Display-name fallbacks for unnamed elements: names the analysis resolved take
         // precedence, then names derived from labeled flows (unnamed gateways/events) —
         // the same derivation the analyzer uses, so both report columns render alike.
@@ -116,16 +123,17 @@ class EvaluationRunner(
             bpmnModel = bpmnModel,
             truePositivesCount = classification.truePositiveIds.size,
             falsePositivesCount = classification.falsePositiveIds.size,
-            falseNegativesCount = classification.falseNegativeIds.size
+            falseNegativesCount = classification.falseNegativeIds.size,
+            activitiesOnly = evaluationRequest.activitiesOnly
         )
-        val perElementType = computePerElementTypeCounts(bpmnModel, classification)
+        val perElementType = computePerElementTypeCounts(bpmnModel, classification, evaluationRequest.activitiesOnly)
 
         if (evaluationRequest.evaluateRag && actualResult.analysisResponse.ragContext.isNullOrEmpty()) {
             log.warn { "RAG context missing or empty -> proceeding with evaluation but metrics might be affected for ${entry.id}" }
         }
 
         val ragMetrics: RagMetrics? = if (evaluationRequest.evaluateRag && actualActivityIds.isNotEmpty()) {
-            ragasEvaluationService.scoreTestCase(actualResult.analysisResponse, bpmnElements)
+            ragasEvaluationService.scoreTestCase(actualResult.analysisResponse, bpmnElements, scopeIds)
         } else {
             if (evaluationRequest.evaluateRag && actualActivityIds.isEmpty()) {
                 log.info { "Skipping RAGAS evaluation for ${entry.id}: LLM returned no critical elements, nothing to score faithfulness against" }

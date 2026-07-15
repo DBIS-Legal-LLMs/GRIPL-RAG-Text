@@ -27,7 +27,8 @@ class RagasEvaluationService(
 
     suspend fun scoreTestCase(
         analysisResponse: AnalysisResponse,
-        bpmnElements: Set<BpmnElement>
+        bpmnElements: Set<BpmnElement>,
+        includeElementIds: Set<String>? = null
     ): RagMetrics? {
         // Use the exact deduplicated pool the analyzer's prompt was built from, so Faithfulness
         // measures grounding against what the LLM actually saw (not the per-element display view).
@@ -39,6 +40,7 @@ class RagasEvaluationService(
         val ragContextById = analysisResponse.ragContext.orEmpty()
 
         val samples = criticalById.mapNotNull { (elementId, critical) ->
+            if (includeElementIds != null && elementId !in includeElementIds) return@mapNotNull null
             if (critical.reason.isBlank()) return@mapNotNull null
             val element = elementsById[elementId]
             val ctx = ragContextById[elementId]

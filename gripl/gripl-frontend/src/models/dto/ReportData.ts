@@ -9,6 +9,7 @@ export interface EvaluationMetadataReport {
     defaultEvaluationEndpoint: string;
     seed: number;
     totalRepetitions?: number;
+    activitiesOnly?: boolean;
     markdown: string;
 }
 
