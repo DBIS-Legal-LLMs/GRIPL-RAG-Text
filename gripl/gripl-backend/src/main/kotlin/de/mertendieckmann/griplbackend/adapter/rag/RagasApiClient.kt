@@ -19,7 +19,11 @@ class RagasApiClient(
     private val log = KotlinLogging.logger {}
 
     private val evaluationUrl: String by lazy { "${ragApiProperties.baseUrl}/api/evaluate/ragas" }
-    private val webClient: WebClient by lazy { webClientBuilder.build() }
+    private val webClient: WebClient by lazy {
+        webClientBuilder
+            .codecs { it.defaultCodecs().maxInMemorySize(32 * 1024 * 1024) }
+            .build()
+    }
 
     suspend fun evaluate(request: RagasEvaluationRequest): RagasEvaluationResponse {
         log.info { "Submitting ${request.samples.size} sample(s) to Ragas evaluator at $evaluationUrl" }
