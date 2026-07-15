@@ -153,6 +153,9 @@ class PromptBpmnAnalyzer(
         fun flatten(): List<String> = entityLines + relationshipLines + documentLines
     }
 
+
+    private fun normalizeKey(value: String): String = value.trim().lowercase()
+
     /**
      * Builds the deduplicated+capped pool fed into the analyzer prompt. The same lines
      * are later reused as `retrieved_contexts` for Ragas so Faithfulness measures grounding
@@ -170,16 +173,17 @@ class PromptBpmnAnalyzer(
             @Suppress("UNCHECKED_CAST")
             (ctx["entities"] as? List<Map<String, Any>> ?: emptyList()).forEachIndexed { rank, e ->
                 val label = (e["label"] as? String) ?: return@forEachIndexed
-                val prev = bestEntityRank[label]
+                val key = normalizeKey(label)
+                val prev = bestEntityRank[key]
                 if (prev == null || rank < prev) {
-                    bestEntityRank[label] = rank
-                    entityByLabel[label] = e
+                    bestEntityRank[key] = rank
+                    entityByLabel[key] = e
                 }
             }
 
             @Suppress("UNCHECKED_CAST")
             (ctx["relationships"] as? List<Map<String, Any>> ?: emptyList()).forEachIndexed { rank, r ->
-                val key = "${r["source_label"]}|${r["label"]}|${r["target_label"]}"
+                val key = normalizeKey("${r["source_label"]}|${r["label"]}|${r["target_label"]}")
                 val prev = bestRelRank[key]
                 if (prev == null || rank < prev) {
                     bestRelRank[key] = rank
