@@ -71,52 +71,35 @@ def _build_langchain_llm():
 
 
 class _OpenAIFloatEmbeddings:
-    """LangChain-compatible embeddings wrapper that forces encoding_format='float'.
 
-    LangChain's built-in OpenAIEmbeddings sends encoding_format='base64' by
-    default, which some providers (e.g. OpenRouter) don't support for all
-    models — they return response.data = None. This wrapper uses the same
-    direct AsyncOpenAI approach that the LightRAG engine already uses.
-    """
-
-    def __init__(self, model: str, api_key: str, base_url: str | None = None):
-        self._model = model
-        self._api_key = api_key
-        self._base_url = base_url
+    def __init__(self):
+        self._client = None  # created lazily on the background loop
+        self._loop = asyncio.new_event_loop()
+        threading.Thread(
+            target=self._loop.run_forever, name="ragas-embeddings", daemon=True
+        ).start()
 
     async def _embed(self, texts: list[str]) -> list[list[float]]:
-        from openai import AsyncOpenAI
+        from app.rag.openai_embeddings import create_embed_client, embed_texts_float
 
-        client = AsyncOpenAI(api_key=self._api_key, base_url=self._base_url or None)
-        try:
-            response = await client.embeddings.create(
-                model=self._model,
-                input=texts,
-                encoding_format="float",
-            )
-        finally:
-            await client.close()
-        return [dp.embedding for dp in response.data]
+        if self._client is None:
+            self._client = create_embed_client()
+        return await embed_texts_float(self._client, texts)
+
+    def _submit(self, texts: list[str]) -> concurrent.futures.Future:
+        return asyncio.run_coroutine_threadsafe(self._embed(texts), self._loop)
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(self._embed(texts))
-
-        def run_in_new_loop():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(self._embed(texts))
-            finally:
-                loop.close()
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            return executor.submit(run_in_new_loop).result()
+        return self._submit(texts).result()
 
     def embed_query(self, text: str) -> list[float]:
         return self.embed_documents([text])[0]
+
+    async def aembed_documents(self, texts: list[str]) -> list[list[float]]:
+        return await asyncio.wrap_future(self._submit(texts))
+
+    async def aembed_query(self, text: str) -> list[float]:
+        return (await self.aembed_documents([text]))[0]
 
 
 def _build_langchain_embeddings():
@@ -125,11 +108,7 @@ def _build_langchain_embeddings():
         api_key = settings.embedding_api_key or os.environ.get("OPENAI_API_KEY", "")
         if not api_key:
             raise RuntimeError("Ragas evaluator: OpenAI embedding api_key is required.")
-        return _OpenAIFloatEmbeddings(
-            model=settings.embedding_model,
-            api_key=api_key,
-            base_url=settings.embedding_api_base or None,
-        )
+        return _OpenAIFloatEmbeddings()
 
     if settings.embedding_binding == "gemini":
         from langchain_google_genai import GoogleGenerativeAIEmbeddings

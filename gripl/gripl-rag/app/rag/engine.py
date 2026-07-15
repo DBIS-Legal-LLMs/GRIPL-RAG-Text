@@ -4,46 +4,13 @@ import os
 from pathlib import Path
 from lightrag import LightRAG
 from app.config import settings
+from app.rag.openai_embeddings import (
+    create_embed_client,
+    embed_texts_float,
+    retry_on_rate_limit,
+)
 
 logger = logging.getLogger(__name__)
-
-# Rate-limit retry settings 
-MAX_RETRIES = 8          # up to ~4 min total wait on worst case
-BASE_DELAY = 2.0         # seconds
-MAX_DELAY = 120.0        # cap per-retry wait
-
-
-async def _retry_on_rate_limit(coro_factory, label: str = "API call"):
-
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            return await coro_factory()
-        except Exception as exc:
-            status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
-            err_msg = str(exc).lower()
-            is_rate_limit = (
-                status == 429
-                or "429" in err_msg
-                or "rate limit" in err_msg
-                or "rate_limit" in err_msg
-                or "ratelimit" in err_msg
-                or "too many requests" in err_msg
-                or status in (502, 503, 529)
-            )
-            if is_rate_limit and attempt < MAX_RETRIES:
-                delay = min(BASE_DELAY * (2 ** (attempt - 1)), MAX_DELAY)
-                logger.warning(
-                    "%s: rate-limited (attempt %d/%d). "
-                    "Retrying in %.1fs …  [%s]",
-                    label, attempt, MAX_RETRIES, delay, exc,
-                )
-                print(
-                    f"Rate-limited on {label} (attempt {attempt}/{MAX_RETRIES}). "
-                    f"Waiting {delay:.0f}s before retry…"
-                )
-                await asyncio.sleep(delay)
-            else:
-                raise
 
 
 def _set_neo4j_env_vars():
@@ -67,7 +34,7 @@ def _get_llm_func():
 
         # Wrap the upstream function so every call gets auto-retry.
         async def _openai_complete_with_retry(*args, **kwargs):
-            return await _retry_on_rate_limit(
+            return await retry_on_rate_limit(
                 lambda: openai_complete(*args, **kwargs),
                 label="LLM",
             )
@@ -133,33 +100,18 @@ def _get_embedding_func():
         )
 
     elif settings.embedding_binding == "openai":
-        # Custom implementation — LightRAG's openai_embed sends
-        # encoding_format="base64" which some providers (e.g. OpenRouter)
-        # don't support for all models, causing response.data = None.
-        from openai import AsyncOpenAI
-
+        # Uses the shared float-encoding + retry helper instead of LightRAG's
+        # openai_embed (see app.rag.openai_embeddings for why).
         # One client for all embedding batches — avoids a new TCP/TLS
         # handshake per call. Safe here because LightRAG always invokes the
         # embedding func from the same (FastAPI) event loop.
-        embed_client = AsyncOpenAI(
-            api_key=settings.embedding_api_key or os.environ.get("OPENAI_API_KEY", ""),
-            base_url=settings.embedding_api_base or None,
-        )
+        embed_client = create_embed_client()
 
         async def _openai_embed_wrapper(texts: list[str]) -> "np.ndarray":
             import numpy as np
 
-            async def _do_embed():
-                response = await embed_client.embeddings.create(
-                    model=settings.embedding_model,
-                    input=texts,
-                    encoding_format="float",
-                )
-                return np.array(
-                    [np.array(dp.embedding, dtype=np.float32) for dp in response.data]
-                )
-
-            return await _retry_on_rate_limit(_do_embed, label="Embedding")
+            vectors = await embed_texts_float(embed_client, texts)
+            return np.array([np.array(v, dtype=np.float32) for v in vectors])
 
         return EmbeddingFunc(
             embedding_dim=settings.embedding_dim,
