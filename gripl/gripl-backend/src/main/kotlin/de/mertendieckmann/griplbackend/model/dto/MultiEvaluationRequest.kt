@@ -11,8 +11,9 @@ data class MultiEvaluationRequest(
     val evaluationDataIds: List<Int> = emptyList(),
     val repetitions: Int = 1,
     val useRag: Boolean = false,
-    val ragMode: String = "hybrid",
+    val ragMode: RagMode = RagMode.HYBRID,
     val evaluateRag: Boolean = true,
+    val activitiesOnly: Boolean = false,
 )
 
 data class ModelRunConfig(

@@ -10,6 +10,7 @@ export interface MultiEvaluationRequest {
     useRag: boolean;
     ragMode: string;
     evaluateRag: boolean;
+    activitiesOnly: boolean;
 }
 
 export interface ModelRunConfig {

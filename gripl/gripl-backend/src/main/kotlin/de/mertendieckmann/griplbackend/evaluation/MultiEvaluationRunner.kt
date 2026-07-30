@@ -45,7 +45,8 @@ class MultiEvaluationRunner(
                     evaluationDataIds = request.evaluationDataIds,
                     useRag = request.useRag,
                     ragMode = request.ragMode,
-                    evaluateRag = request.evaluateRag
+                    evaluateRag = request.evaluateRag,
+                    activitiesOnly = request.activitiesOnly
                 )
 
                 singleRunner.run(singleRequest)
@@ -73,7 +74,8 @@ class MultiEvaluationRunner(
             totalTestCases = totalTestCases,
             seed = seed,
             defaultEvaluationEndpoint = request.defaultEvaluationEndpoint,
-            totalRepetitions = repetitions
+            totalRepetitions = repetitions,
+            activitiesOnly = request.activitiesOnly
         )
     }
 

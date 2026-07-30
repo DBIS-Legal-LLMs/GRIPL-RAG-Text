@@ -20,9 +20,6 @@ rag_working_dir/
 tests/
 data/
 
-# Scripts not needed in the image
-scripts/
-
 # IDE / OS
 .idea/
 .vscode/

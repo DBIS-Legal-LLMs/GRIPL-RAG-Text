@@ -10,6 +10,7 @@ import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
 import de.mertendieckmann.griplbackend.model.dto.RagDocument
 import de.mertendieckmann.griplbackend.model.dto.RagElementContext
 import de.mertendieckmann.griplbackend.model.dto.RagEntity
+import de.mertendieckmann.griplbackend.model.dto.RagMode
 import de.mertendieckmann.griplbackend.model.dto.RagRelationship
 import dev.langchain4j.model.chat.ChatModel
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -20,24 +21,23 @@ import kotlinx.coroutines.sync.withPermit
 import java.util.*
 
 class PromptBpmnAnalyzer(
-    llm: ChatModel,
+    private val llm: ChatModel,
     private val ragApiClient: RagApiClient
 ) : BpmnAnalyzer {
 
     private val log = KotlinLogging.logger { }
     private val memoryProvider = SharedChatMemoryProvider(50)
-    private val bpmnAnalysisAiServiceWithRag = PromptBpmnAnalysisAiServiceFactory.create(llm, memoryProvider)
-    private val bpmnAnalysisAiServiceNoRag = PromptBpmnAnalysisAiServiceFactory.createWithoutRag(llm, memoryProvider)
     private val safetyNet = SafetyNet(llm, memoryProvider)
 
-    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: String): AnalysisResponse {
+    override fun analyzeBpmnForGdpr(bpmnXml: String, useRag: Boolean, ragMode: RagMode, activitiesOnly: Boolean): AnalysisResponse {
         val sessionId = UUID.randomUUID().toString()
 
         val bpmnElements = BpmnExtractor().extractBpmnElements(bpmnXml)
 
         if (useRag) {
             // RAG-augmented path
-            val ragContextMap = fetchRagContext(bpmnElements, ragMode)
+            val bpmnAnalysisAiServiceWithRag = PromptBpmnAnalysisAiServiceFactory.create(llm, memoryProvider, activitiesOnly)
+            val ragContextMap = fetchRagContext(bpmnElements, ragMode, activitiesOnly = activitiesOnly)
 
             val pool = buildDedupedPool(ragContextMap)
 
@@ -62,6 +62,7 @@ class PromptBpmnAnalyzer(
             )
         } else {
             // Original path — unchanged from evaluation baseline
+            val bpmnAnalysisAiServiceNoRag = PromptBpmnAnalysisAiServiceFactory.createWithoutRag(llm, memoryProvider, activitiesOnly)
             val result = safetyNet.safeGuardAnalysisResultParsing(sessionId, maxRetries = 3) {
                 bpmnAnalysisAiServiceNoRag.analyze(sessionId, bpmnElements)
             }
@@ -81,8 +82,9 @@ class PromptBpmnAnalyzer(
 
     private fun fetchRagContext(
         bpmnElements: Set<BpmnElement>,
-        ragMode: String,
-        maxConcurrency: Int = 8
+        ragMode: RagMode,
+        maxConcurrency: Int = 8,
+        activitiesOnly: Boolean = false
     ): Map<String, Map<String, Any>> {
         val semaphore = Semaphore(maxConcurrency)
 
@@ -93,7 +95,9 @@ class PromptBpmnAnalyzer(
                         // Retrieve GDPR context for every classifiable element (activities,
                         // events, gateways, data objects/stores) — not just activities. Only
                         // textAnnotation is excluded, as it is never classified.
+                        // In activitiesOnly mode, only activities are classified
                         if (element.type.equals("textAnnotation", ignoreCase = true)) return@async null
+                        if (activitiesOnly && !element.isActivity) return@async null
 
                         val flowLabelText = (element.outgoingFlowLabels + element.incomingFlowLabels +
                                 element.outgoingMessageFlowLabels + element.incomingMessageFlowLabels)
@@ -152,6 +156,9 @@ class PromptBpmnAnalyzer(
         fun flatten(): List<String> = entityLines + relationshipLines + documentLines
     }
 
+
+    private fun normalizeKey(value: String): String = value.trim().lowercase()
+
     /**
      * Builds the deduplicated+capped pool fed into the analyzer prompt. The same lines
      * are later reused as `retrieved_contexts` for Ragas so Faithfulness measures grounding
@@ -169,16 +176,17 @@ class PromptBpmnAnalyzer(
             @Suppress("UNCHECKED_CAST")
             (ctx["entities"] as? List<Map<String, Any>> ?: emptyList()).forEachIndexed { rank, e ->
                 val label = (e["label"] as? String) ?: return@forEachIndexed
-                val prev = bestEntityRank[label]
+                val key = normalizeKey(label)
+                val prev = bestEntityRank[key]
                 if (prev == null || rank < prev) {
-                    bestEntityRank[label] = rank
-                    entityByLabel[label] = e
+                    bestEntityRank[key] = rank
+                    entityByLabel[key] = e
                 }
             }
 
             @Suppress("UNCHECKED_CAST")
             (ctx["relationships"] as? List<Map<String, Any>> ?: emptyList()).forEachIndexed { rank, r ->
-                val key = "${r["source_label"]}|${r["label"]}|${r["target_label"]}"
+                val key = normalizeKey("${r["source_label"]}|${r["label"]}|${r["target_label"]}")
                 val prev = bestRelRank[key]
                 if (prev == null || rank < prev) {
                     bestRelRank[key] = rank

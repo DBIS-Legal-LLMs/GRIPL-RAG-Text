@@ -9,9 +9,10 @@ data class EvaluationRequest(
     val datasets: List<Int>,
     val evaluationDataIds: List<Int> = emptyList(),
     val useRag: Boolean = false,
-    val ragMode: String = "hybrid",
-    val evaluateRag: Boolean = true
+    val ragMode: RagMode = RagMode.HYBRID,
+    val evaluateRag: Boolean = true,
+    val activitiesOnly: Boolean = false
 ) {
     override fun toString(): String =
-        "EvaluationRequest(evaluationEndpoint=$evaluationEndpoint, useRag=$useRag, ragMode=$ragMode, evaluateRag=$evaluateRag, llmProps=${llmProps?.copy(apiKey = llmProps?.apiKey?.let { "\"****\"" })})"
+        "EvaluationRequest(evaluationEndpoint=$evaluationEndpoint, useRag=$useRag, ragMode=$ragMode, evaluateRag=$evaluateRag, activitiesOnly=$activitiesOnly, llmProps=${llmProps?.copy(apiKey = llmProps?.apiKey?.let { "\"****\"" })})"
 }

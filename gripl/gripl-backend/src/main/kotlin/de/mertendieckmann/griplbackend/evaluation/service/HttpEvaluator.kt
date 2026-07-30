@@ -37,6 +37,7 @@ class HttpEvaluator(
         // but we send them explicitly so behaviour matches the evaluation request config.
         bodyBuilder.part("useRag", evaluationRequest.useRag.toString())
         bodyBuilder.part("ragMode", evaluationRequest.ragMode.toString())
+        bodyBuilder.part("activitiesOnly", evaluationRequest.activitiesOnly.toString())
 
         val absoluteEndpoint = if (evaluationRequest.evaluationEndpoint.startsWith("http://") || evaluationRequest.evaluationEndpoint.startsWith("https://")) {
             evaluationRequest.evaluationEndpoint

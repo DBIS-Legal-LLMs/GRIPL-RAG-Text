@@ -5,6 +5,7 @@ import de.mertendieckmann.griplbackend.application.analyzer.AnalyzerFactory
 import de.mertendieckmann.griplbackend.config.LlmConfig
 import de.mertendieckmann.griplbackend.model.dto.AnalysisEndpoint
 import de.mertendieckmann.griplbackend.model.dto.AnalysisResponse
+import de.mertendieckmann.griplbackend.model.dto.RagMode
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.core.env.Environment
@@ -13,20 +14,12 @@ import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.http.codec.multipart.FilePart
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.server.ResponseStatusException
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 
 @RestController
 @RequestMapping("/gdpr/analysis")
-@CrossOrigin(
-    origins = ["\${app.frontend.base-url}"],
-    allowCredentials = "true",
-    allowedHeaders = ["*"],
-    methods = [
-        RequestMethod.GET,
-        RequestMethod.POST,
-    ]
-)
 class AnalysisController(
     private val analyzerFactory: AnalyzerFactory,
     private val llmConfig: LlmConfig,
@@ -57,11 +50,13 @@ class AnalysisController(
         @RequestPart("bpmnFile") file: FilePart,
         @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
         @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
-        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("activitiesOnly", required = false) activitiesOnlyPart: org.springframework.http.codec.multipart.FormFieldPart?
     ): Mono<ResponseEntity<AnalysisResponse>> {
 
         val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
-        val ragMode = ragModePart?.value() ?: "hybrid"
+        val ragMode = parseRagMode(ragModePart)
+        val activitiesOnly = activitiesOnlyPart?.value()?.toBooleanStrictOrNull() ?: false
 
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
         val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
@@ -73,7 +68,8 @@ class AnalysisController(
                 analyzer.analyzeBpmnForGdpr(
                     bpmnXml = bpmnXml,
                     useRag = useRag,
-                    ragMode = ragMode
+                    ragMode = ragMode,
+                    activitiesOnly = activitiesOnly
                 )            }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
@@ -92,11 +88,13 @@ class AnalysisController(
         @RequestPart("bpmnFile") file: FilePart,
         @RequestPart("llmProps", required = false) llmPropsOverrides: LlmConfig.Companion.LlmPropsOverride? = null,
         @RequestPart("useRag", required = false) useRagPart: org.springframework.http.codec.multipart.FormFieldPart?,
-        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?
+        @RequestPart("ragMode", required = false) ragModePart: org.springframework.http.codec.multipart.FormFieldPart?,
+        @RequestPart("activitiesOnly", required = false) activitiesOnlyPart: org.springframework.http.codec.multipart.FormFieldPart?
     ): Mono<ResponseEntity<AnalysisResponse>> {
 
         val useRag = useRagPart?.value()?.toBooleanStrictOrNull() ?: false
-        val ragMode = ragModePart?.value() ?: "hybrid"   
+        val ragMode = parseRagMode(ragModePart)
+        val activitiesOnly = activitiesOnlyPart?.value()?.toBooleanStrictOrNull() ?: false
         val bpmnXmlMono: Mono<String> = ControllerUtils.getBpmnXmlMono(file)
         val resolvedLlmPropsOverride = ControllerUtils.resolveEnvironmentVariables(llmPropsOverrides, env)
 
@@ -107,8 +105,18 @@ class AnalysisController(
                 analyzer.analyzeBpmnForGdpr(
                     bpmnXml = bpmnXml,
                     useRag = useRag,
-                    ragMode = ragMode
+                    ragMode = ragMode,
+                    activitiesOnly = activitiesOnly
                 )            }.subscribeOn(Schedulers.boundedElastic())
         }.map { ResponseEntity.ok(it) }
     }
-}   
+
+    private fun parseRagMode(ragModePart: org.springframework.http.codec.multipart.FormFieldPart?): RagMode {
+        val raw = ragModePart?.value() ?: return RagMode.HYBRID
+        return try {
+            RagMode.fromString(raw)
+        } catch (e: IllegalArgumentException) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, e.message)
+        }
+    }
+}

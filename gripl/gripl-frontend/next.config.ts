@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+    experimental: {
+        proxyTimeout: 1_800_000, // 30 min
+    },
     webpack(config, { isServer }) {
         config.module.rules.push({
             test: /\.bpmn$/,

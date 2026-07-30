@@ -49,6 +49,25 @@ class BpmnExtractor {
             .filter { it.target.id == elementId }
             .mapNotNull { flow -> flow.name?.takeIf { it.isNotBlank() }?.let { BpmnFlowLabel(it, flow.source.id) } }
 
+    /**
+     * The name of the pool (participant) whose process contains this element.
+     *
+     * Elements nested inside subprocesses have a SubProcessImpl parent, not a
+     * ProcessImpl, so casting parentElement directly would throw. Walk up the
+     * XML tree to the nearest enclosing process instead; nested elements belong
+     * to the same pool as their top-level process.
+     */
+    private fun resolvePoolName(bpmnModel: BpmnModelInstance, element: BaseElement): String? {
+        var ancestor = element.parentElement
+        while (ancestor != null && ancestor !is ProcessImpl) {
+            ancestor = ancestor.parentElement
+        }
+        val processId = (ancestor as? ProcessImpl)?.id ?: return null
+        return bpmnModel.getModelElementsByType(Participant::class.java)
+            .find { it.getAttributeValue("processRef") == processId }
+            ?.name
+    }
+
     fun extractBpmnElements(bpmnXml: String): Set<BpmnElement> {
         val bpmnModel = Bpmn.readModelFromStream(bpmnXml.byteInputStream())
         Bpmn.validateModel(bpmnModel)
@@ -71,7 +90,7 @@ class BpmnExtractor {
                         name = element.name,
                         documentation = element.documentations.joinToString { it.rawTextContent },
                         isActivity = true,
-                        poolName = bpmnModel.getModelElementsByType(Participant::class.java).find { it.getAttributeValue("processRef") == (element.parentElement as ProcessImpl).id }?.name,
+                        poolName = resolvePoolName(bpmnModel, element),
                         laneName = element.parentElement
                             .getChildElementsByType(LaneSet::class.java)
                             .flatMap { it.getChildElementsByType(Lane::class.java) }
@@ -105,7 +124,7 @@ class BpmnExtractor {
                         id = element.id,
                         name = element.name,
                         documentation = element.documentations.joinToString { it.rawTextContent },
-                        poolName = bpmnModel.getModelElementsByType(Participant::class.java).find { it.getAttributeValue("processRef") == (element.parentElement as ProcessImpl).id }?.name,
+                        poolName = resolvePoolName(bpmnModel, element),
                         laneName = element.parentElement
                             .getChildElementsByType(LaneSet::class.java)
                             .flatMap { it.getChildElementsByType(Lane::class.java) }

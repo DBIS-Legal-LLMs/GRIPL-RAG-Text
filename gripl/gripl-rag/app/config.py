@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     neo4j_username: str = "neo4j"
     neo4j_password: str = "gripl-rag-2026"
 
+    # --- Timeouts (seconds) ---
+    rag_query_timeout: float = 300.0    # POST /api/query end-to-end retrieval
+    ragas_metric_timeout: float = 600.0  # single Ragas metric scoring call
+
     # --- LightRAG Working Directory ---
     rag_working_dir: str = "./rag_working_dir"
 

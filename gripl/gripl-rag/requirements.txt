@@ -12,6 +12,9 @@ lightrag-hku>=1.4.0
 # --- Google Gemini SDK ---
 google-genai>=1.0.0
 
+# --- Local embeddings + reranking (SentenceTransformer / CrossEncoder) ---
+sentence-transformers>=3.0.0
+
 # --- Neo4j Python driver ---
 neo4j>=5.0.0
 
